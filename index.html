@@ -3,43 +3,70 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Camp Passion</title>
+    <title>Race to Survive</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="styles/main.css">
 </head>
 <body>
-    <header>
-        <h1>Camp Passion</h1>
-        <p>Generate timed tests with the help of DeepSeek AI Chatbot to help you study faster!</p>
+    <header class="main-header">
+      <h1>Race to Survive</h1>
+      <p class="subtitle">Challenge yourself with AI-generated, timed tests. Improve, survive, and race to the top!</p>
     </header>
     <main>
-        <section id="input-form">
-            <h2>Test Generator</h2>
-            <form id="test-form">
-                <label for="topic">Topic:</label>
-                <input type="text" id="topic" name="topic" required>
-
-                <label for="grade-level">Grade Level:</label>
-                <input type="text" id="grade-level" name="grade-level" required>
-
-                <label for="subject">Subject:</label>
-                <input type="text" id="subject" name="subject" required>
-
-                <label for="title">Test Title:</label>
-                <input type="text" id="title" name="title" required>
-
-                <label for="description">Description/Notes:</label>
-                <textarea id="description" name="description" required></textarea>
-
-                <button type="submit">Generate Test</button>
-            </form>
-        </section>
-        <section id="results">
-            <h2>Generated Test</h2>
-            <div id="test-output"></div>
-            <div id="score-feedback"></div>
-        </section>
+      <section id="input-form" class="card">
+        <h2>Test Generator</h2>
+        <form id="test-form">
+          <div class="form-row">
+            <label for="topic">Topic</label>
+            <input type="text" id="topic" name="topic" required>
+          </div>
+          <div class="form-row">
+            <label for="grade-level">Grade Level</label>
+            <input type="text" id="grade-level" name="grade-level" required>
+          </div>
+          <div class="form-row">
+            <label for="subject">Subject</label>
+            <input type="text" id="subject" name="subject" required>
+          </div>
+          <div class="form-row">
+            <label for="title">Test Title</label>
+            <input type="text" id="title" name="title" required>
+          </div>
+          <div class="form-row">
+            <label for="description">Description/Notes</label>
+            <textarea id="description" name="description" required></textarea>
+          </div>
+          <div class="form-row">
+            <label for="num-questions"># of Questions</label>
+            <input type="number" id="num-questions" name="num-questions" min="1" max="20" value="5" required>
+          </div>
+          <div class="form-row">
+            <label for="short-answer">% Short Answer</label>
+            <input type="number" id="short-answer" name="short-answer" min="0" max="100" value="40" required>
+          </div>
+          <div class="form-row">
+            <label for="time-limit">Time Limit (minutes)</label>
+            <input type="number" id="time-limit" name="time-limit" min="1" max="120" value="10" required>
+          </div>
+          <button type="submit" class="primary-btn">Generate Test</button>
+        </form>
+      </section>
+      <section id="test-section" class="card" style="display:none;">
+        <h2>Your Test <span id="timer"></span></h2>
+        <form id="user-test-form"></form> 
+        <button id="submit-test-btn" class="primary-btn" style="display:none;">Submit Test</button>
+      </section>
+      <section id="results" class="card" style="display:none;">
+        <h2>Results</h2>
+        <div id="score-feedback"></div>
+        <div id="recommendations"></div>
+      </section>
     </main>
-    <script src="scripts/chatbot.js"></script>
+    <footer class="footer">
+      <p>Powered by DeepSeek AI | &copy; 2025 Race to Survive</p>
+    </footer>
     <script src="scripts/app.js"></script>
 </body>
 </html> 
