@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Race to Survive</title>
+    <link rel="stylesheet" href="styles/main.css">
+</head>
+<body>
+    <header>
+        <h1>Race to Survive</h1>
+        <p>Generate timed tests with the help of DeepSeek AI Chatbot</p>
+    </header>
+    <main>
+        <section id="input-form">
+            <h2>Test Generator</h2>
+            <form id="test-form">
+                <label for="topic">Topic:</label>
+                <input type="text" id="topic" name="topic" required>
+
+                <label for="grade-level">Grade Level:</label>
+                <input type="text" id="grade-level" name="grade-level" required>
+
+                <label for="subject">Subject:</label>
+                <input type="text" id="subject" name="subject" required>
+
+                <label for="title">Test Title:</label>
+                <input type="text" id="title" name="title" required>
+
+                <label for="description">Description/Notes:</label>
+                <textarea id="description" name="description" required></textarea>
+
+                <button type="submit">Generate Test</button>
+            </form>
+        </section>
+        <section id="results">
+            <h2>Generated Test</h2>
+            <div id="test-output"></div>
+            <div id="score-feedback"></div>
+        </section>
+    </main>
+    <script src="scripts/chatbot.js"></script>
+    <script src="scripts/app.js"></script>
+</body>
+</html>
