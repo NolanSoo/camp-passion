@@ -218,7 +218,7 @@ body.light-theme .styled-select {
   .card {
     padding: 1.2rem 0.7rem;
     max-width: 98vw;
-  }
+  } /* mobile support */
   main {
     min-height: 60vh;
   }
