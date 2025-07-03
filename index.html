@@ -80,6 +80,23 @@
         <button id="submit-test-btn" class="primary-btn" style="display:none;">Submit Answer</button>
         <div id="question-feedback"></div>
         <div id="live-score"></div>
+        <!-- Study Modes Modal -->
+        <div id="study-modes-modal" class="modal" style="display:none;">
+          <div class="modal-content">
+            <h3>Choose a Study Mode!</h3>
+            <button class="study-mode-btn" data-mode="speed">Speed Run</button>
+            <button class="study-mode-btn" data-mode="focus">Focus Mode</button>
+            <button class="study-mode-btn" data-mode="double">Double Points</button>
+            <button class="close-modal-btn">Close</button>
+          </div>
+        </div>
+        <!-- Power-Ups Section -->
+        <div id="power-ups-section" style="display:none;">
+          <h4>Power-Ups</h4>
+          <button class="power-up-btn" data-power="extra-time" disabled>Extra Time</button>
+          <button class="power-up-btn" data-power="skip" disabled>Skip</button>
+          <button class="power-up-btn" data-power="hint" disabled>Hint</button>
+        </div>
       </section>
       <section id="results" class="card" style="display:none;"> 
         <h2>Results</h2>
@@ -87,6 +104,7 @@
         <div id="recommendations"></div>
         <div id="live-strengths"></div>
         <div id="live-weaknesses"></div>
+        <button id="restart-btn" class="primary-btn">Restart</button>
       </section>
     </main>
     <script src="scripts/app.js"></script>

@@ -1,6 +1,303 @@
 // Race to Survive - JavaScript version (converted from TypeScript)
 // All features included, minimal changes for browser compatibility
 
+// --- MODERN FEATURE-RICH LOGIC INTEGRATION ---
+// --- GLOBAL STATE ---
+let quizData = [];
+let quizCurrentQuestion = 0;
+let quizScore = 0;
+let quizTimer = null;
+let quizTimeLeft = 0;
+let quizStreak = 0;
+let studyMode = null;
+let powerUps = { extraTime: false, skip: false, hint: false };
+let usedPowerUps = { extraTime: false, skip: false, hint: false };
+let unlockedPowerUps = false;
+let quizSettings = {};
+let liveStrengthsArr = [];
+let liveWeaknessesArr = [];
+
+// --- DOM ELEMENTS (for new features) ---
+const inputFormSection = document.getElementById('input-form');
+const powerUpsDiv = document.getElementById('power-ups');
+
+// --- LOADING OVERLAY & AI TIP ---
+async function showLoadingWithTip(topic) {
+  loadingOverlay.classList.remove('hidden');
+  document.getElementById('loading-tip').textContent = 'Tip: ' + await fetchAITip(topic);
+}
+function hideLoading() {
+  loadingOverlay.classList.add('hidden');
+}
+async function fetchAITip(topic) {
+  // Simulate AI tip fetch (replace with real API if needed)
+  const tips = [
+    `Focus on key terms in ${topic}.`,
+    `Practice with a timer for ${topic}.`,
+    `Review mistakes to improve in ${topic}.`,
+    `Break down complex ${topic} concepts.`,
+    `Use process of elimination for tough questions.`
+  ];
+  return tips[Math.floor(Math.random() * tips.length)];
+}
+
+// --- QUIZ GENERATION (SIMULATED for new features) ---
+async function generateQuiz(settings) {
+  // Simulate API call for quiz generation
+  const questions = [];
+  for (let i = 0; i < settings.numQuestions; i++) {
+    const isMC = Math.random() > settings.shortAnswerPercent / 100;
+    if (isMC) {
+      // MC: 6-8 options, 1-2 correct, 2-3 plausible, rest far-off
+      const correct = [`Correct Answer ${i+1}`];
+      const plausible = [`Plausible ${i+1}A`, `Plausible ${i+1}B`];
+      const far = [`Far ${i+1}A`, `Far ${i+1}B`, `Far ${i+1}C`];
+      const options = [...correct, ...plausible, ...far].sort(() => Math.random() - 0.5);
+      questions.push({
+        type: 'mc',
+        question: `Sample MC Question ${i+1} about ${settings.topic}?`,
+        options,
+        correct,
+        plausible,
+        far
+      });
+    } else {
+      questions.push({
+        type: 'short',
+        question: `Sample Short Answer Question ${i+1} about ${settings.topic}?`,
+        answer: `Sample answer ${i+1}`
+      });
+    }
+  }
+  return questions;
+}
+
+// --- MODERN QUESTION DISPLAY (for new features) ---
+function showQuestion() {
+  if (quizCurrentQuestion >= quizData.length) {
+    showResults();
+    return;
+  }
+  const q = quizData[quizCurrentQuestion];
+  questionNumberSpan.textContent = `${quizCurrentQuestion + 1} / ${quizData.length}`;
+  userTestForm.innerHTML = '';
+  questionFeedback.textContent = '';
+  submitTestBtn.style.display = '';
+  if (q.type === 'mc') {
+    q.options.forEach((opt, idx) => {
+      const label = document.createElement('label');
+      label.className = 'mc-option';
+      const input = document.createElement('input');
+      input.type = 'checkbox';
+      input.name = 'mc';
+      input.value = opt;
+      label.appendChild(input);
+      label.appendChild(document.createTextNode(opt));
+      userTestForm.appendChild(label);
+      userTestForm.appendChild(document.createElement('br'));
+    });
+  } else {
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.name = 'short';
+    input.required = true;
+    userTestForm.appendChild(input);
+  }
+  // Timer
+  startTimer(30);
+  // Power-ups
+  renderPowerUps();
+  // Study mode modal after 5 questions
+  if (quizCurrentQuestion === 5 && !studyMode) {
+    showStudyModeModal();
+  }
+}
+
+// --- TIMER (for new features) ---
+function startTimer(seconds) {
+  clearInterval(quizTimer);
+  quizTimeLeft = seconds;
+  timerSpan.textContent = `⏰ ${quizTimeLeft}s`;
+  quizTimer = setInterval(() => {
+    quizTimeLeft--;
+    timerSpan.textContent = `⏰ ${quizTimeLeft}s`;
+    if (quizTimeLeft <= 0) {
+      clearInterval(quizTimer);
+      gradeCurrentQuestion(true);
+    }
+  }, 1000);
+}
+
+// --- GRADING (for new features) ---
+function gradeCurrentQuestion(timeout = false) {
+  clearInterval(quizTimer);
+  const q = quizData[quizCurrentQuestion];
+  let points = 0;
+  let feedback = '';
+  if (q.type === 'mc') {
+    const selected = Array.from(userTestForm.querySelectorAll('input[name="mc"]:checked')).map(i => i.value);
+    let correctCount = 0, plausibleCount = 0, farCount = 0;
+    selected.forEach(val => {
+      if (q.correct.includes(val)) correctCount++;
+      else if (q.plausible.includes(val)) plausibleCount++;
+      else if (q.far.includes(val)) farCount++;
+    });
+    points = correctCount * 2 + plausibleCount * 1 - farCount * 1;
+    if (points < 0) points = 0;
+    feedback = `+${points} (${correctCount} correct, ${plausibleCount} plausible, ${farCount} far-off)`;
+    if (correctCount === q.correct.length && farCount === 0) {
+      quizStreak++;
+      liveStrengthsArr.push(q.question);
+    } else {
+      quizStreak = 0;
+      liveWeaknessesArr.push(q.question);
+    }
+  } else {
+    const val = userTestForm.querySelector('input[name="short"]').value.trim();
+    if (val.toLowerCase() === q.answer.toLowerCase()) {
+      points = 3;
+      feedback = '+3 (Perfect!)';
+      quizStreak++;
+      liveStrengthsArr.push(q.question);
+    } else if (val && q.answer.toLowerCase().includes(val.toLowerCase().slice(0, 3))) {
+      points = 1;
+      feedback = '+1 (Partial)';
+      quizStreak = 0;
+      liveWeaknessesArr.push(q.question);
+    } else {
+      points = 0;
+      feedback = '0 (Missed)';
+      quizStreak = 0;
+      liveWeaknessesArr.push(q.question);
+    }
+  }
+  if (timeout) feedback = '⏰ Time up! ' + feedback;
+  quizScore += points;
+  questionFeedback.textContent = feedback;
+  liveScore.textContent = `Score: ${quizScore}`;
+  // Unlock power-ups if streak
+  if (quizStreak >= 3 && !unlockedPowerUps) {
+    unlockedPowerUps = true;
+    showPowerUpsModal();
+  }
+  // Next question after delay
+  submitTestBtn.style.display = 'none';
+  setTimeout(() => {
+    quizCurrentQuestion++;
+    showQuestion();
+  }, 1200);
+}
+
+// --- STUDY MODES (for new features) ---
+function showStudyModeModal() {
+  // Simple prompt for demo; replace with modal if needed
+  const mode = prompt('Choose Study Mode: 1) Speed Run 2) Focus Mode 3) Double Points', '1');
+  if (mode === '1') studyMode = 'speed';
+  else if (mode === '2') studyMode = 'focus';
+  else if (mode === '3') studyMode = 'double';
+  else studyMode = null;
+}
+
+// --- POWER-UPS (for new features) ---
+function showPowerUpsModal() {
+  alert('Power-ups unlocked! Use them wisely: Extra Time, Skip, Hint.');
+}
+function renderPowerUps() {
+  let container = powerUpsDiv;
+  if (!container) {
+    container = document.createElement('div');
+    container.id = 'power-ups';
+    container.className = 'power-ups';
+    testSection.insertBefore(container, userTestForm);
+  }
+  container.innerHTML = '';
+  ['extraTime', 'skip', 'hint'].forEach(pu => {
+    const btn = document.createElement('button');
+    btn.textContent = pu === 'extraTime' ? '⏳ Extra Time' : pu === 'skip' ? '⏭️ Skip' : '💡 Hint';
+    btn.className = 'power-up-btn';
+    btn.disabled = !unlockedPowerUps || usedPowerUps[pu];
+    btn.onclick = () => usePowerUp(pu);
+    container.appendChild(btn);
+  });
+}
+function usePowerUp(type) {
+  if (!unlockedPowerUps || usedPowerUps[type]) return;
+  usedPowerUps[type] = true;
+  if (type === 'extraTime') {
+    quizTimeLeft += 15;
+    timerSpan.textContent = `⏰ ${quizTimeLeft}s (+15!)`;
+  } else if (type === 'skip') {
+    questionFeedback.textContent = 'Skipped!';
+    setTimeout(() => {
+      quizCurrentQuestion++;
+      showQuestion();
+    }, 800);
+    return;
+  } else if (type === 'hint') {
+    questionFeedback.textContent = 'Hint: Focus on the main concept!';
+  }
+  renderPowerUps();
+}
+
+// --- RESULTS (for new features) ---
+function showResults() {
+  testSection.style.display = 'none';
+  resultsSection.style.display = '';
+  scoreFeedback.textContent = `Final Score: ${quizScore} / ${quizData.length * 3}`;
+  recommendations.textContent = 'Review your weaknesses and try again!';
+  liveStrengths.textContent = 'Strengths: ' + liveStrengthsArr.join('; ');
+  liveWeaknesses.textContent = 'Weaknesses: ' + liveWeaknessesArr.join('; ');
+  // Add restart button
+  if (!document.getElementById('restart-btn')) {
+    const btn = document.createElement('button');
+    btn.id = 'restart-btn';
+    btn.className = 'primary-btn';
+    btn.textContent = 'Restart';
+    btn.onclick = () => {
+      resultsSection.style.display = 'none';
+      inputFormSection.style.display = '';
+    };
+    resultsSection.appendChild(btn);
+  }
+}
+
+// --- EVENT LISTENERS (for new features) ---
+if (testForm) {
+  testForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    quizSettings = {
+      topic: testForm.topic.value,
+      grade: testForm['grade-level'].value,
+      subject: testForm.subject.value,
+      title: testForm.title.value,
+      description: testForm.description.value,
+      numQuestions: parseInt(testForm['num-questions'].value),
+      shortAnswerPercent: parseInt(testForm['short-answer'].value)
+    };
+    showLoadingWithTip(quizSettings.topic);
+    quizData = await generateQuiz(quizSettings);
+    hideLoading();
+    inputFormSection.style.display = 'none';
+    resultsSection.style.display = 'none';
+    testSection.style.display = '';
+    quizCurrentQuestion = 0;
+    quizScore = 0;
+    quizStreak = 0;
+    studyMode = null;
+    unlockedPowerUps = false;
+    usedPowerUps = { extraTime: false, skip: false, hint: false };
+    liveStrengthsArr = [];
+    liveWeaknessesArr = [];
+    showQuestion();
+  });
+}
+if (submitTestBtn) {
+  submitTestBtn.addEventListener('click', (e) => {
+    e.preventDefault();
+    gradeCurrentQuestion();
+  });
+}
+
 // --- Types removed (JS doesn't need them) ---
 // --- QuestionTracker class ---
 class QuestionTracker {
