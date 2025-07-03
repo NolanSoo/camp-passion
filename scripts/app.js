@@ -6,12 +6,79 @@ const API_HOST = "deepseek-v31.p.rapidapi.com"
 const API_URL = "https://deepseek-v31.p.rapidapi.com/"
 
 const STUDY_TIPS = [
-  "Tip: Use the Feynman technique - explain the topic in simple terms.",
+  "Tip: Enjoy yourself! Learning is meant to be fun - not a chore.",
+  "If you can't explain it simply, you don't understand it well enough. - Albert Einstein",
+  "You got this! - Nolan Soo (2025)",
   "Tip: Spaced repetition is key to long-term memory.",
   "Tip: Take short breaks every 25-30 minutes to stay focused.",
   "Tip: Test yourself frequently, don't just re-read notes.",
   "Fun Fact: The brain is more active during sleep than during the day!",
   "Tip: Connect what you're learning to what you already know.",
+  "A good plan violently executed now is better than a perfect plan executed next week. - George S. Patton",
+  "You can’t be everything to everyone. - Sabrina Carpenter",
+  "I’m still learning to love myself. - Sabrina Carpenter",
+  "Don’t let anyone dim your light. - Sabrina Carpenter",
+  "Be proud of who you are. - Olivia Rodrigo",
+  "Sometimes it’s okay not to be okay. - Olivia Rodrigo",
+  "If you’re passionate about something, go for it. - Olivia Rodrigo",
+  "You are enough, just as you are. - Billie Eilish",
+  "It’s okay to make mistakes. That’s how you grow. - Billie Eilish",
+  "Happiness is a journey, not a destination. - Billie Eilish",
+  "Be fearless in the pursuit of what sets your soul on fire. - Taylor Swift",
+  "Just keep dancing through. - Taylor Swift",
+  "The lesson is, you can still be kind and strong. - Taylor Swift",
+  "Treat people with kindness. - Harry Styles",
+  "A little kindness goes a long way. - Harry Styles",
+  "Dream with ambition, lead with conviction. - Beyoncé",
+  "Don’t stop believing in yourself. - Beyoncé",
+  "You’re stronger than you think. - Demi Lovato",
+  "Stay true to yourself. - Demi Lovato",
+  "You can’t control everything, but you can control your attitude. - Ariana Grande",
+  "Keep your head up. - Ariana Grande",
+  "Let your light shine. - Lizzo",
+  "Self-love is the best love. - Lizzo",
+  "You are your own best friend. - Lizzo",
+  "Be the best version of yourself. - Shawn Mendes",
+  "Every day is a new beginning. - Shawn Mendes",
+  "Don’t be afraid to stand out. - Camila Cabello",
+  "Believe in your dreams. - Camila Cabello",
+  "Sometimes the smallest step in the right direction ends up being the biggest step of your life. - Naeem Callaway (THIS QUOTE IS A BANGER - IF YOU TAKE MANY STEPS, YOU WILL REACH THINGS UNIMAGINABLE TO YOU MAYBE JUST A FEW MONTHS/YEARS AGO :))",
+  "Be the light in someone else’s day. - Forrest Frank",
+  "You’re not alone in this. - Forrest Frank",
+  "Take it one day at a time. - Forrest Frank",
+  "You can’t control everything, but you can control your attitude. - Ryan Trahan",
+  "Every day is a new adventure. - Ryan Trahan",
+  "Don’t be afraid to try something new. - Ryan Trahan",
+  "Stay curious and keep learning. - Ryan Trahan",
+  "Mistakes are just part of the journey. - Ryan Trahan",
+  "Celebrate the little wins. - Ryan Trahan",
+  "Keep showing up, even when it’s hard. - Ryan Trahan",
+  "You don’t have to be perfect to make progress. - Ryan Trahan",
+  "Be yourself, everyone else is taken. - Ryan Trahan",
+  "Dream big, start small. - Ryan Trahan",
+  "Your story matters. - Ryan Trahan",
+  "Tip: Set specific, achievable goals for each study session.",
+  "Tip: Use diagrams and visuals to help remember concepts.",
+  "Tip: Practice active recall instead of passive reading.",
+  "Tip: Mix up subjects to keep your brain engaged.",
+  "Tip: Don’t be afraid to ask for help.",
+  "Tip: Sleep is essential for memory consolidation.",
+  "Tip: Hydrate! Your brain needs water to function well.",
+  "Tip: Celebrate small wins to stay motivated.",
+  "Tip: Use flashcards for quick review.",
+  "Tip: Study in short, focused bursts.",
+  "Tip: Listen to instrumental music to boost concentration.",
+  "Tip: Write summaries in your own words.",
+  "Tip: Find a study buddy for accountability.",
+  "Tip: Take care of your mental health.",
+  "Tip: Break big tasks into smaller steps.",
+  "Tip: Use color coding to organize information.",
+  "Tip: Stay curious and keep asking questions.",
+  "Tip: Visualize your success.",
+  "Tip: Mistakes are proof that you are trying.",
+  "Tip: Keep a positive mindset.",
+  "Tip: Reflect on what works best for you.",
+  "Tip: Consistency beats cramming.",
 ]
 
 // --- DOM ELEMENTS ---
@@ -252,6 +319,8 @@ async function showResults() {
           ? "C"
           : state.totalScore >= 60
             ? "D"
+            : state.totalScore >= 50
+            ? "F+"
             : "F"
   scoreFeedback.innerHTML = `<b>Final Score:</b> ${state.totalScore}% <span class='grade-badge'>${grade}</span>`
 
@@ -291,7 +360,7 @@ async function handleFormSubmit(e) {
 
   try {
     const questions = await generateQuiz(state.settings)
-    if (!questions || !questions.length) throw new Error("AI failed to generate questions.")
+    if (!questions || !questions.length) throw new Error("Question failed to generate. You can restart the quiz.")
     state.quizData = questions
     state.quizData.forEach((q) => questionTracker.addQuestion(state.sessionId, q.question))
 
@@ -327,7 +396,7 @@ async function handleAnswerSubmit(e) {
     questionFeedback.textContent = "AI is evaluating your answer..."
     try {
       result = await evaluateShortAnswer(q.question, userInput, q.answer)
-      questionFeedback.innerHTML = `<b>Feedback:</b> Graded!`
+      questionFeedback.innerHTML = `<b>Feedback:</b> Evaluation finished.`
       aiFeedbackContent.innerHTML = `<p><strong>Score:</strong> ${result.score}%</p><p>${result.feedback}</p>`
       aiFeedbackCard.style.display = "block"
     } catch (e) {
