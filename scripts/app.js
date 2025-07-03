@@ -1,3 +1,58 @@
+// --- FINAL POLISH: Fix loose ends, ensure robust UX ---
+
+// 1. Prevent duplicate restart button
+function showResults() {
+  testSection.style.display = 'none';
+  resultsSection.style.display = '';
+  scoreFeedback.textContent = `Final Score: ${quizScore} / ${quizData.length * 3}`;
+  recommendations.textContent = 'Review your weaknesses and try again!';
+  liveStrengths.textContent = 'Strengths: ' + liveStrengthsArr.join('; ');
+  liveWeaknesses.textContent = 'Weaknesses: ' + liveWeaknessesArr.join('; ');
+  // Remove any old restart button
+  const oldBtn = document.getElementById('restart-btn');
+  if (oldBtn) oldBtn.remove();
+  // Add restart button
+  const btn = document.createElement('button');
+  btn.id = 'restart-btn';
+  btn.className = 'primary-btn';
+  btn.textContent = 'Restart';
+  btn.onclick = () => {
+    resultsSection.style.display = 'none';
+    inputFormSection.style.display = '';
+  };
+  resultsSection.appendChild(btn);
+}
+
+// 2. Always reset memeMode toggle on reload
+window.addEventListener('DOMContentLoaded', () => {
+  memeMode = false;
+  const memeToggle = document.getElementById('meme-mode-toggle');
+  if (memeToggle) memeToggle.textContent = 'Toggle Memes/Brainrot Mode';
+});
+
+// 3. Prevent multiple event listeners on testForm and submitTestBtn
+if (testForm) {
+  testForm.replaceWith(testForm.cloneNode(true));
+  // Re-query after replace
+  window.testForm = document.getElementById('test-form');
+}
+if (submitTestBtn) {
+  submitTestBtn.replaceWith(submitTestBtn.cloneNode(true));
+  window.submitTestBtn = document.getElementById('submit-test-btn');
+}
+
+// 4. Defensive: Hide loading overlay on error
+function hideLoading() {
+  loadingOverlay.classList.add('hidden');
+  loadingTip.textContent = '';
+}
+
+// 5. Defensive: Always clear timer on navigation
+function clearAllTimers() {
+  clearInterval(quizTimer);
+  clearInterval(timerInterval);
+}
+window.addEventListener('beforeunload', clearAllTimers);
 // Race to Survive - JavaScript version (converted from TypeScript)
 // All features included, minimal changes for browser compatibility
 
