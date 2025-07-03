@@ -13,6 +13,7 @@
     <div id="loading-overlay" class="hidden">
       <div class="loader"></div>
       <div class="loading-text">Generating your test... Please wait!</div>
+      <div class="loading-tip" id="loading-tip"></div>
     </div>
     <header class="main-header">
       <h1>Race to Survive</h1>
@@ -31,7 +32,8 @@
           </div>
           <div class="form-row">
             <label for="grade-level">Grade Level</label>
-            <select id="grade-level" name="grade-level" required>
+            <select id="grade-level" name="grade-level" class="styled-select" required>
+              <option value="" disabled selected>Select grade level</option>
               <option value="6">6th Grade</option>
               <option value="7">7th Grade</option>
               <option value="8">8th Grade</option>
@@ -44,12 +46,13 @@
           </div>
           <div class="form-row">
             <label for="subject">Subject</label>
-            <select id="subject" name="subject" required>
-              <option value="English">English</option>
-              <option value="Math">Math</option>
-              <option value="Science">Science</option>
-              <option value="History">History</option>
-              <option value="General">General</option>
+            <select id="subject" name="subject" class="styled-select" required>
+              <option value="" disabled selected>Select subject</option>
+              <option value="English">English (Literature, Writing)</option>
+              <option value="Math">Math (Algebra, Geometry, Calculus)</option>
+              <option value="Science">Science (Biology, Chemistry, Physics)</option>
+              <option value="History">History (World, US, AP)</option>
+              <option value="General">General (Mixed Topics)</option>
             </select>
           </div>
           <div class="form-row">

@@ -117,8 +117,32 @@ function buildPrompt(data, sessionId) {
     `[ {"type": "mc", "question": "...", "options": ["A", "B", "C", "D"], "answer": "A"}, {"type": "short", "question": "...", "answer": "..."} ]`;
 }
 
+const LOADING_TIPS = [
+  "Tip: Read each question carefully before answering!",
+  "Tip: Partial credit is possible for close answers.",
+  "Tip: Use the timer to pace yourself.",
+  "Tip: Review your strengths and weaknesses after 5 questions.",
+  "Tip: Try to eliminate obviously wrong options first.",
+  "Tip: You can switch between light and dark themes!",
+  "Tip: Short answers get partial credit if they're close.",
+  "Tip: Some MC options may give negative points if far off!"
+];
 function showLoading(show) {
   loadingOverlay.classList.toggle('hidden', !show);
+  const tip = LOADING_TIPS[Math.floor(Math.random() * LOADING_TIPS.length)];
+  document.getElementById('loading-tip').textContent = show ? tip : '';
+  if (show) {
+    // If loading takes more than 2 seconds, show a message
+    if (window.loadingTimeout) clearTimeout(window.loadingTimeout);
+    window.loadingTimeout = setTimeout(() => {
+      if (!loadingOverlay.classList.contains('hidden')) {
+        loadingOverlay.querySelector('.loading-text').textContent = 'Still working... This may take a few more seconds.';
+      }
+    }, 2000);
+  } else {
+    if (window.loadingTimeout) clearTimeout(window.loadingTimeout);
+    loadingOverlay.querySelector('.loading-text').textContent = 'Generating your test... Please wait!';
+  }
 }
 
 function generateTest(data, sessionId) {
@@ -174,7 +198,14 @@ function renderQuestion(idx) {
   label.textContent = q.question;
   wrapper.appendChild(label);
   if (q.type === 'mc' && q.options) {
-    q.options.forEach((opt, i) => {
+    // Ensure 6-8 options
+    let opts = q.options;
+    if (opts.length < 6) {
+      // Add dummy options if needed
+      for (let i = opts.length; i < 6; i++) opts.push('Option ' + String.fromCharCode(65 + i));
+    }
+    if (opts.length > 8) opts = opts.slice(0, 8);
+    opts.forEach((opt, i) => {
       const optId = `q${idx}_opt${i}`;
       const radio = document.createElement('input');
       radio.type = 'radio';
@@ -243,12 +274,26 @@ function letterGrade(score) {
 function scoreSingleQuestion(q, userAns) {
   if (!userAns) return { correct: false, score: 0, feedback: 'No answer submitted.' };
   if (q.type === 'mc') {
+    // Partial/negative credit system
     const correct = userAns.trim().toLowerCase() === q.answer.trim().toLowerCase();
-    return {
-      correct,
-      score: correct ? 100 : 0,
-      feedback: correct ? 'Correct!' : `Incorrect. Correct answer: ${q.answer}`
-    };
+    if (correct) {
+      return { correct: true, score: 100, feedback: 'Correct!' };
+    }
+    // Partial credit for "close" options (string similarity)
+    let maxSim = 0;
+    for (const opt of q.options) {
+      if (opt !== q.answer) {
+        const sim = similarity(opt, q.answer);
+        if (opt === userAns) maxSim = sim;
+      }
+    }
+    if (maxSim >= 0.6) {
+      return { correct: false, score: 50, feedback: 'Close! Partial credit.' };
+    } else if (maxSim >= 0.4) {
+      return { correct: false, score: 30, feedback: 'Somewhat reasonable, but not quite.' };
+    } else {
+      return { correct: false, score: -20, feedback: 'Far off. Negative points.' };
+    }
   } else {
     const sim = similarity(userAns, q.answer);
     const correct = sim >= 0.7;
