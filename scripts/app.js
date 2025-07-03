@@ -577,20 +577,92 @@ function selectStudyMode(event) {
 // --- EVENT LISTENERS ---
 // --- SHOW QUESTION FUNCTION ---
 // --- ADVANCED SHOW QUESTION FUNCTION (restores all features) ---
-function showQuestion() {
-  if (!quizData || !quizData.length || currentQuestion >= quizData.length) {
-    showResults();
-    return;
-  }
-  // Clear previous content
+
+// --- UI/UX POLISH: TS-style renderQuestion and updateLiveStats ---
+let userAnswers = [];
+let perQuestionScores = [];
+let perQuestionFeedback = [];
+let strengths = [];
+let weaknesses = [];
+let totalScore = 0;
+
+function renderQuestion(idx) {
   userTestForm.innerHTML = '';
   questionFeedback.innerHTML = '';
-  liveScore.innerHTML = '';
   submitTestBtn.style.display = 'block';
-  // Get current question
-  const q = quizData[currentQuestion];
-  questionNumberSpan.textContent = `${currentQuestion + 1} / ${quizData.length}`;
-  // Timer logic (study mode aware))
+  const q = quizData[idx];
+  questionNumberSpan.textContent = `${idx + 1} / ${quizData.length}`;
+  const wrapper = document.createElement('div');
+  wrapper.className = 'form-row';
+  const label = document.createElement('label');
+  label.textContent = memeMode ? `💀 ${q.question}` : q.question;
+  wrapper.appendChild(label);
+  if (q.type === 'mc' && q.options) {
+    q.options.forEach((opt, i) => {
+      const optId = `q${idx}_opt${i}`;
+      const radio = document.createElement('input');
+      radio.type = 'radio';
+      radio.name = `q${idx}`;
+      radio.value = opt;
+      radio.id = optId;
+      const optLabel = document.createElement('label');
+      optLabel.htmlFor = optId;
+      optLabel.textContent = opt;
+      wrapper.appendChild(radio);
+      wrapper.appendChild(optLabel);
+    });
+  } else {
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.name = `q${idx}`;
+    input.placeholder = memeMode ? 'Drop the sauce...' : 'Your answer';
+    wrapper.appendChild(input);
+  }
+  userTestForm.appendChild(wrapper);
+}
+
+function updateLiveStats() {
+  const answered = perQuestionScores.length;
+  if (answered === 0) {
+    liveScore.innerHTML = '';
+    liveStrengths.innerHTML = '';
+    liveWeaknesses.innerHTML = '';
+    return;
+  }
+  const avg = Math.round(perQuestionScores.reduce((a, b) => a + b, 0) / answered);
+  totalScore = avg;
+  liveScore.innerHTML = `<b>Current Score:</b> ${avg}% <span class='grade-badge'>${avg >= 90 ? 'A' : avg >= 80 ? 'B' : avg >= 70 ? 'C' : avg >= 60 ? 'D' : 'F'}</span>`;
+  // Simple strengths/weaknesses: based on last 5 answers
+  const last5 = perQuestionScores.slice(-5);
+  strengths = [];
+  weaknesses = [];
+  if (last5.filter(s => s >= 90).length >= 3) strengths.push('Consistent high performance');
+  if (last5.filter(s => s < 70).length >= 2) weaknesses.push('Multiple recent mistakes');
+  if (perQuestionFeedback.slice(-5).some(f => f.includes('Partial'))) weaknesses.push('Short answers need more detail');
+  if (perQuestionFeedback.slice(-5).some(f => f.includes('Correct'))) strengths.push('Strong multiple choice');
+  if (answered >= 5) {
+    liveStrengths.innerHTML = `<b>Strengths:</b> <ul>${strengths.map(s => `<li>${s}</li>`).join('')}</ul>`;
+    liveWeaknesses.innerHTML = `<b>Weaknesses:</b> <ul>${weaknesses.map(s => `<li>${s}</li>`).join('')}</ul>`;
+  }
+}
+
+function showQuestion() {
+  if (!quizData || !quizData.length || currentQuestion >= quizData.length) {
+    // Show results in TS-style
+    testSection.style.display = 'none';
+    resultsSection.style.display = 'block';
+    scoreFeedback.innerHTML = `<b>Final Score:</b> ${totalScore}% <span class='grade-badge'>${totalScore >= 90 ? 'A' : totalScore >= 80 ? 'B' : totalScore >= 70 ? 'C' : totalScore >= 60 ? 'D' : 'F'}</span>`;
+    recommendations.innerHTML = totalScore >= 90
+      ? 'Excellent! Try a harder test or new topic.'
+      : totalScore >= 70
+      ? 'Good job! Review your mistakes for mastery.'
+      : 'Needs improvement. Focus on your weak areas.';
+    liveStrengths.innerHTML = `<b>Strengths:</b> <ul>${strengths.map(s => `<li>${s}</li>`).join('')}</ul>`;
+    liveWeaknesses.innerHTML = `<b>Weaknesses:</b> <ul>${weaknesses.map(s => `<li>${s}</li>`).join('')}</ul>`;
+    return;
+  }
+  renderQuestion(currentQuestion);
+  // Timer logic (study mode aware)
   if (timer) clearInterval(timer);
   let baseTime = 45;
   if (studyMode && STUDY_MODES[studyMode] && STUDY_MODES[studyMode].effect.timeMultiplier !== undefined) {
@@ -613,40 +685,11 @@ function showQuestion() {
   } else {
     timerSpan.textContent = '⏰ No time limit';
   }
-  // Render question
-  const wrapper = document.createElement('div');
-  wrapper.className = 'form-row';
-  const label = document.createElement('label');
-  label.textContent = memeMode ? `💀 ${q.question}` : q.question;
-  wrapper.appendChild(label);
-  if (q.type === 'mc' && q.options) {
-    q.options.forEach((opt, i) => {
-      const optId = `q${currentQuestion}_opt${i}`;
-      const radio = document.createElement('input');
-      radio.type = 'radio';
-      radio.name = `q${currentQuestion}`;
-      radio.value = opt;
-      radio.id = optId;
-      const optLabel = document.createElement('label');
-      optLabel.htmlFor = optId;
-      optLabel.textContent = opt;
-      wrapper.appendChild(radio);
-      wrapper.appendChild(optLabel);
-    });
-  } else {
-    const input = document.createElement('input');
-    input.type = 'text';
-    input.name = `q${currentQuestion}`;
-    input.placeholder = memeMode ? 'Drop the sauce...' : 'Your answer';
-    wrapper.appendChild(input);
-  }
-  userTestForm.appendChild(wrapper);
-  // Show submit button
-  submitTestBtn.style.display = 'block';
   // Attach submit handler for this question
-  submitTestBtn.onclick = async function (e) {
+  submitTestBtn.onclick = function (e) {
     e.preventDefault();
     if (timer) clearInterval(timer);
+    const q = quizData[currentQuestion];
     let userAns = '';
     if (q.type === 'mc') {
       const checked = userTestForm.querySelector('input[type="radio"]:checked');
@@ -662,20 +705,20 @@ function showQuestion() {
     if (q.type === 'mc') {
       if (q.correct && q.correct.includes(userAns)) {
         correct = true;
-        points = 3 * pointMultiplier;
+        points = 100;
         feedback = memeMode ? 'W answer, giga-brain 🧠' : 'Correct!';
       } else if (q.options && q.options.includes(userAns)) {
         // Partial credit for plausible answers
         const plausible = q.options.filter(opt => !q.correct.includes(opt));
         if (plausible.includes(userAns)) {
-          points = 1 * pointMultiplier;
+          points = 60;
           feedback = memeMode ? 'Mid but valid (partial credit)' : 'Partial credit.';
         } else {
-          points = -1;
+          points = 0;
           feedback = memeMode ? 'Skill issue 💀' : 'Incorrect.';
         }
       } else {
-        points = -1;
+        points = 0;
         feedback = memeMode ? 'Skill issue 💀' : 'Incorrect.';
       }
     } else {
@@ -684,27 +727,22 @@ function showQuestion() {
       const user = (userAns || '').toLowerCase();
       if (ans && user && (user === ans || ans.includes(user) || user.includes(ans))) {
         correct = true;
-        points = 3 * pointMultiplier;
+        points = 100;
         feedback = memeMode ? 'Bussin answer 🔥' : 'Good answer!';
       } else if (user && ans && user.length > 0 && ans.length > 0) {
-        points = 1 * pointMultiplier;
+        points = 60;
         feedback = memeMode ? 'Kinda mid, but you tried' : `Partial: Model answer: ${q.answer}`;
       } else {
-        points = -1;
+        points = 0;
         feedback = memeMode ? 'Skill issue 💀' : `Model answer: ${q.answer}`;
       }
     }
-    // Update score, streak, analytics
-    score += points;
-    if (correct) {
-      streak++;
-      showToast(memeMode ? '🔥 Streak up! ' + streak : `Streak: ${streak}`);
-    } else {
-      streak = 0;
-    }
-    // Live score and feedback
-    liveScore.innerHTML = `<b>Score:</b> ${score} <span class='grade-badge'>${score >= 0 ? '👍' : '👎'}</span> <b>Streak:</b> ${streak}`;
+    // Track answers and feedback
+    userAnswers[currentQuestion] = userAns;
+    perQuestionScores[currentQuestion] = points;
+    perQuestionFeedback[currentQuestion] = feedback;
     questionFeedback.innerHTML = `<b>Feedback:</b> ${feedback}`;
+    updateLiveStats();
     // Power-ups unlock
     if (streak > 0 && streak % 3 === 0) {
       showPowerUpsModal();
