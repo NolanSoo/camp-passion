@@ -2,6 +2,9 @@
 // All features included, minimal changes for browser compatibility
 
 // --- MODERN FEATURE-RICH LOGIC INTEGRATION ---
+// --- MEMES/BRAINROT MODE ---
+let memeMode = false;
+
 // --- GLOBAL STATE ---
 let quizData = [];
 let quizCurrentQuestion = 0;
@@ -20,6 +23,21 @@ let liveWeaknessesArr = [];
 // --- DOM ELEMENTS (for new features) ---
 const inputFormSection = document.getElementById('input-form');
 const powerUpsDiv = document.getElementById('power-ups');
+
+// --- Add Memes/Brainrot Mode Toggle ---
+if (!document.getElementById('meme-mode-toggle')) {
+  const memeToggle = document.createElement('button');
+  memeToggle.id = 'meme-mode-toggle';
+  memeToggle.className = 'primary-btn';
+  memeToggle.textContent = 'Toggle Memes/Brainrot Mode';
+  memeToggle.style.margin = '0.5em 0';
+  memeToggle.onclick = () => {
+    memeMode = !memeMode;
+    memeToggle.textContent = memeMode ? 'Memes/Brainrot Mode: ON' : 'Toggle Memes/Brainrot Mode';
+    alert(memeMode ? 'Memes/Brainrot Mode ACTIVATED. Get ready for some Gen Alpha brainrot.' : 'Back to normal mode.');
+  };
+  document.querySelector('header')?.appendChild(memeToggle);
+}
 
 // --- LOADING OVERLAY & AI TIP ---
 async function showLoadingWithTip(topic) {
@@ -49,13 +67,57 @@ async function generateQuiz(settings) {
     const isMC = Math.random() > settings.shortAnswerPercent / 100;
     if (isMC) {
       // MC: 6-8 options, 1-2 correct, 2-3 plausible, rest far-off
-      const correct = [`Correct Answer ${i+1}`];
-      const plausible = [`Plausible ${i+1}A`, `Plausible ${i+1}B`];
-      const far = [`Far ${i+1}A`, `Far ${i+1}B`, `Far ${i+1}C`];
-      const options = [...correct, ...plausible, ...far].sort(() => Math.random() - 0.5);
+      let correct, plausible, far, options;
+      if (memeMode) {
+        correct = [`W fr answer ${i+1} (no cap)`];
+        plausible = [
+          `Valid take ${i+1}A (mid but passable)`,
+          `Lowkey makes sense ${i+1}B`
+        ];
+        far = [
+          `Bro what ${i+1}A (💀)`,
+          `This ain't it ${i+1}B`,
+          `Sigma grindset ${i+1}C (wrong)`
+        ];
+        options = [
+          ...correct,
+          ...plausible,
+          ...far,
+          `Touch grass ${i+1}D`,
+          `NPC response ${i+1}E`,
+          `Skibidi rizz ${i+1}F`
+        ].sort(() => Math.random() - 0.5).slice(0, Math.floor(Math.random()*3)+6); // 6-8 options
+      } else {
+        correct = [`Correct Answer ${i+1}`];
+        plausible = [`Plausible but tricky ${i+1}A`, `Almost right ${i+1}B`];
+        far = [
+          `Completely off ${i+1}A`,
+          `Wild guess ${i+1}B`,
+          `Distractor ${i+1}C`
+        ];
+        // All options are now unique and meaningful, no "option e" or similar
+        const extraOptions = [
+          `Curveball: ${settings.topic} myth`,
+          `Wildcard: ${settings.subject} twist`,
+          `Red herring: ${settings.grade} rumor`,
+          `Old exam trick`,
+          `Popular misconception`,
+          `Classic trap answer`,
+          `Internet urban legend`,
+          `Obvious bait`
+        ];
+        options = [
+          ...correct,
+          ...plausible,
+          ...far,
+          ...extraOptions.sort(() => Math.random() - 0.5)
+        ].slice(0, Math.floor(Math.random()*3)+6); // 6-8 options, all unique
+      }
       questions.push({
         type: 'mc',
-        question: `Sample MC Question ${i+1} about ${settings.topic}?`,
+        question: memeMode
+          ? `🔥 Q${i+1}: ${settings.topic}? (No Ls, only Ws. Stay based.)`
+          : `Sample MC Question ${i+1} about ${settings.topic}?`,
         options,
         correct,
         plausible,
@@ -64,8 +126,12 @@ async function generateQuiz(settings) {
     } else {
       questions.push({
         type: 'short',
-        question: `Sample Short Answer Question ${i+1} about ${settings.topic}?`,
-        answer: `Sample answer ${i+1}`
+        question: memeMode
+          ? `💀 Q${i+1}: Drop the sauce on ${settings.topic} (no mid answers, go giga-brain)`
+          : `Sample Short Answer Question ${i+1} about ${settings.topic}?`,
+        answer: memeMode
+          ? `Peak answer ${i+1} (built different)`
+          : `Sample answer ${i+1}`
       });
     }
   }
@@ -144,7 +210,11 @@ function gradeCurrentQuestion(timeout = false) {
     });
     points = correctCount * 2 + plausibleCount * 1 - farCount * 1;
     if (points < 0) points = 0;
-    feedback = `+${points} (${correctCount} correct, ${plausibleCount} plausible, ${farCount} far-off)`;
+    if (memeMode) {
+      feedback = `+${points} (W${correctCount}, mid${plausibleCount}, L${farCount}) ${points > 0 ? 'EZ clap' : 'Ratio + try again'}${correctCount > 0 ? ' 🗿' : ''}`;
+    } else {
+      feedback = `+${points} (${correctCount} correct, ${plausibleCount} plausible, ${farCount} far-off)`;
+    }
     if (correctCount === q.correct.length && farCount === 0) {
       quizStreak++;
       liveStrengthsArr.push(q.question);
@@ -156,22 +226,22 @@ function gradeCurrentQuestion(timeout = false) {
     const val = userTestForm.querySelector('input[name="short"]').value.trim();
     if (val.toLowerCase() === q.answer.toLowerCase()) {
       points = 3;
-      feedback = '+3 (Perfect!)';
+      feedback = memeMode ? '+3 (Peak answer, giga-brain 🧠)' : '+3 (Perfect!)';
       quizStreak++;
       liveStrengthsArr.push(q.question);
     } else if (val && q.answer.toLowerCase().includes(val.toLowerCase().slice(0, 3))) {
       points = 1;
-      feedback = '+1 (Partial)';
+      feedback = memeMode ? '+1 (Not mid, but not peak either)' : '+1 (Partial)';
       quizStreak = 0;
       liveWeaknessesArr.push(q.question);
     } else {
       points = 0;
-      feedback = '0 (Missed)';
+      feedback = memeMode ? '0 (Bro, what was that answer 💀)' : '0 (Missed)';
       quizStreak = 0;
       liveWeaknessesArr.push(q.question);
     }
   }
-  if (timeout) feedback = '⏰ Time up! ' + feedback;
+  if (timeout) feedback = (memeMode ? '⏰ Time up! L moment. ' : '⏰ Time up! ') + feedback;
   quizScore += points;
   questionFeedback.textContent = feedback;
   liveScore.textContent = `Score: ${quizScore}`;
