@@ -78,14 +78,20 @@
         <h2>Question <span id="question-number"></span> <span id="timer"></span></h2>
         <form id="user-test-form"></form>
         <button id="submit-test-btn" class="primary-btn" style="display:none;">Submit Answer</button>
-        <div id="question-feedback"></div>
+        <div id="question-feedback-container">
+          <div id="question-feedback"></div>
+          <div id="ai-feedback" class="ai-feedback-card" style="display:none;">
+            <h4>🧠 AI Analysis</h4>
+            <div id="ai-feedback-content"></div>
+          </div>
+        </div>
         <div id="live-score"></div>
         <!-- Study Modes Modal -->
         <div id="study-modes-modal" class="modal" style="display:none;">
           <div class="modal-content">
             <h3>Choose a Study Mode!</h3>
-            <button class="study-mode-btn" data-mode="speed">Speedrun to Survive</button>
-            <button class="study-mode-btn" data-mode="focus">Focus In</button>
+            <button class="study-mode-btn" data-mode="speed">Speed Run</button>
+            <button class="study-mode-btn" data-mode="focus">Focus Mode</button>
             <button class="study-mode-btn" data-mode="double">Double Points</button>
             <button class="close-modal-btn">Close</button>
           </div>
@@ -101,12 +107,15 @@
       <section id="results" class="card" style="display:none;"> 
         <h2>Results</h2>
         <div id="score-feedback"></div>
-        <div id="recommendations"></div>
+        <div id="recommendations">
+          <h4>💡 Study Recommendations</h4>
+          <div id="recommendations-content"></div>
+        </div>
         <div id="live-strengths"></div>
         <div id="live-weaknesses"></div>
-        <button id="restart-btn" class="primary-btn">Restart Quiz</button>
+        <button id="restart-btn" class="primary-btn">Restart</button>
       </section>
     </main>
     <script src="scripts/app.js"></script>
 </body>
-</html> 
+</html>
