@@ -18,6 +18,7 @@ class DeepSeekChatbot {
             - Additional Context: ${description}
             - Number of multiple choice questions: ${multipleChoiceCount}
             - Number of short answer questions: ${shortAnswerCount}
+            - Make all questions appropriate for the specified grade level focusing on a combination of topic knowledge, critical thinking, and application skills.
             
             Format the response as a JSON object with this structure:
             {
