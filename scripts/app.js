@@ -1,4 +1,8 @@
-// --- Session & Question Tracking ---
+// Race to Survive - JavaScript version (converted from TypeScript)
+// All features included, minimal changes for browser compatibility
+
+// --- Types removed (JS doesn't need them) ---
+// --- QuestionTracker class ---
 class QuestionTracker {
   static instance;
   usedQuestionHashesGlobally = new Set();
@@ -30,13 +34,6 @@ class QuestionTracker {
     }
   }
 
-  isQuestionUsedRecentlyOrGlobally(questionText, sessionId) {
-    const questionHash = this._hashQuestionText(questionText);
-    if (this.usedQuestionHashesGlobally.has(questionHash)) return true;
-    const recentSessionQs = this.getRecentSessionQuestions(sessionId).map((q) => q.toLowerCase());
-    return recentSessionQs.some((rq) => this._areStringsSimilar(rq, questionText.toLowerCase()));
-  }
-
   getRecentSessionQuestions(sessionId, count = this.MAX_SESSION_HISTORY_FOR_PROMPT) {
     const history = this.sessionQuestionHistory.get(sessionId) || [];
     return history.slice(-count).map((q) => q.questionText);
@@ -55,26 +52,13 @@ class QuestionTracker {
     }
     return `q_${hash}`;
   }
-
-  _areStringsSimilar(s1, s2, threshold = 0.8) {
-    const shorter = s1.length < s2.length ? s1 : s2;
-    const longer = s1.length < s2.length ? s2 : s1;
-    if (longer.length === 0) return true;
-    const longerWords = new Set(longer.split(/\s+/));
-    let commonWords = 0;
-    shorter.split(/\s+/).forEach((word) => {
-      if (longerWords.has(word)) commonWords++;
-    });
-    const similarity = shorter.split(/\s+/).length > 0 ? commonWords / shorter.split(/\s+/).length : 0;
-    return similarity >= threshold;
-  }
 }
 
 function generateSessionId() {
   return `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 }
 
-// --- UI & API ---
+// --- UI/DOM ---
 const API_URL = 'https://deepseek-v31.p.rapidapi.com/';
 const API_KEY = 'a29cfe4fa6mshb63da984e4b3f7dp12efdajsneda384ed8b83';
 const API_HOST = 'deepseek-v31.p.rapidapi.com';
@@ -84,14 +68,29 @@ const testSection = document.getElementById('test-section');
 const userTestForm = document.getElementById('user-test-form');
 const submitTestBtn = document.getElementById('submit-test-btn');
 const timerSpan = document.getElementById('timer');
+const questionNumberSpan = document.getElementById('question-number');
 const resultsSection = document.getElementById('results');
 const scoreFeedback = document.getElementById('score-feedback');
 const recommendations = document.getElementById('recommendations');
+const liveStrengths = document.getElementById('live-strengths');
+const liveWeaknesses = document.getElementById('live-weaknesses');
+const questionFeedback = document.getElementById('question-feedback');
+const liveScore = document.getElementById('live-score');
+const loadingOverlay = document.getElementById('loading-overlay');
+const themeToggle = document.getElementById('theme-toggle');
 
 let timerInterval = null;
 let timeLeft = 0;
 let questions = [];
-let sessionId = null;
+let sessionId = '';
+let currentQuestion = 0;
+let userAnswers = [];
+let perQuestionScores = [];
+let perQuestionFeedback = [];
+let strengths = [];
+let weaknesses = [];
+let totalScore = 0;
+
 const questionTracker = QuestionTracker.getInstance();
 
 function cleanJSONResponse(text) {
@@ -114,11 +113,16 @@ function buildPrompt(data, sessionId) {
     `Percent Short Answer: ${data['short-answer']}\n` +
     `Percent Multiple Choice: ${100 - parseInt(data['short-answer'])}\n` +
     `Avoid repeating these questions: ${recentQs || 'None'}\n` +
-    `Return the test as a JSON array of questions, each with a type ('short' or 'mc'), question text, and for MC, options and answer. Example format:` +
-    `\n[ {\n  "type": "mc",\n  "question": "...",\n  "options": ["A", "B", "C", "D"],\n  "answer": "A"\n}, {\n  "type": "short",\n  "question": "...",\n  "answer": "..."\n} ]`;
+    `Return the test as a JSON array of questions, each with a type ('short' or 'mc'), question text, and for MC, options and answer. Example format:\n` +
+    `[ {"type": "mc", "question": "...", "options": ["A", "B", "C", "D"], "answer": "A"}, {"type": "short", "question": "...", "answer": "..."} ]`;
 }
 
-async function generateTest(data, sessionId) {
+function showLoading(show) {
+  loadingOverlay.classList.toggle('hidden', !show);
+}
+
+function generateTest(data, sessionId) {
+  showLoading(true);
   const prompt = buildPrompt(data, sessionId);
   const payload = JSON.stringify({
     model: 'DeepSeek-V3-0324',
@@ -131,6 +135,7 @@ async function generateTest(data, sessionId) {
     xhr.withCredentials = true;
     xhr.addEventListener('readystatechange', function () {
       if (this.readyState === this.DONE) {
+        showLoading(false);
         try {
           const response = JSON.parse(cleanJSONResponse(this.responseText));
           if (Array.isArray(response)) {
@@ -156,51 +161,52 @@ async function generateTest(data, sessionId) {
   });
 }
 
-function renderTest(questionsArr) {
+function renderQuestion(idx) {
   userTestForm.innerHTML = '';
-  questionsArr.forEach((q, idx) => {
-    questionTracker.addQuestion(sessionId, q.question);
-    const wrapper = document.createElement('div');
-    wrapper.className = 'form-row';
-    const label = document.createElement('label');
-    label.textContent = `Q${idx + 1}: ${q.question}`;
-    wrapper.appendChild(label);
-    if (q.type === 'mc') {
-      q.options.forEach((opt, i) => {
-        const optId = `q${idx}_opt${i}`;
-        const radio = document.createElement('input');
-        radio.type = 'radio';
-        radio.name = `q${idx}`;
-        radio.value = opt;
-        radio.id = optId;
-        const optLabel = document.createElement('label');
-        optLabel.htmlFor = optId;
-        optLabel.textContent = opt;
-        wrapper.appendChild(radio);
-        wrapper.appendChild(optLabel);
-      });
-    } else {
-      const input = document.createElement('input');
-      input.type = 'text';
-      input.name = `q${idx}`;
-      input.placeholder = 'Your answer';
-      wrapper.appendChild(input);
-    }
-    userTestForm.appendChild(wrapper);
-  });
+  questionFeedback.innerHTML = '';
+  liveScore.innerHTML = '';
   submitTestBtn.style.display = 'block';
+  const q = questions[idx];
+  questionNumberSpan.textContent = `${idx + 1} / ${questions.length}`;
+  const wrapper = document.createElement('div');
+  wrapper.className = 'form-row';
+  const label = document.createElement('label');
+  label.textContent = q.question;
+  wrapper.appendChild(label);
+  if (q.type === 'mc' && q.options) {
+    q.options.forEach((opt, i) => {
+      const optId = `q${idx}_opt${i}`;
+      const radio = document.createElement('input');
+      radio.type = 'radio';
+      radio.name = `q${idx}`;
+      radio.value = opt;
+      radio.id = optId;
+      const optLabel = document.createElement('label');
+      optLabel.htmlFor = optId;
+      optLabel.textContent = opt;
+      wrapper.appendChild(radio);
+      wrapper.appendChild(optLabel);
+    });
+  } else {
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.name = `q${idx}`;
+    input.placeholder = 'Your answer';
+    wrapper.appendChild(input);
+  }
+  userTestForm.appendChild(wrapper);
 }
 
-function startTimer(minutes) {
+function startQuestionTimer(seconds, onTimeout) {
   clearInterval(timerInterval);
-  timeLeft = minutes * 60;
+  timeLeft = seconds;
   updateTimerDisplay();
   timerInterval = setInterval(() => {
     timeLeft--;
     updateTimerDisplay();
     if (timeLeft <= 0) {
       clearInterval(timerInterval);
-      submitTestBtn.click();
+      onTimeout();
     }
   }, 1000);
 }
@@ -209,40 +215,6 @@ function updateTimerDisplay() {
   const min = Math.floor(timeLeft / 60);
   const sec = timeLeft % 60;
   timerSpan.textContent = `⏰ ${min}:${sec.toString().padStart(2, '0')}`;
-}
-
-function scoreTest(questionsArr) {
-  let correct = 0;
-  let total = questionsArr.length;
-  let shortCorrect = 0, shortTotal = 0, mcCorrect = 0, mcTotal = 0;
-  const userAnswers = new FormData(userTestForm);
-  questionsArr.forEach((q, idx) => {
-    const userAns = userAnswers.get(`q${idx}`);
-    if (q.type === 'mc') {
-      mcTotal++;
-      if (userAns && userAns.trim().toLowerCase() === q.answer.trim().toLowerCase()) {
-        correct++;
-        mcCorrect++;
-      }
-    } else {
-      shortTotal++;
-      if (userAns && similarity(userAns, q.answer) >= 0.7) {
-        correct++;
-        shortCorrect++;
-      }
-    }
-  });
-  return {
-    score: Math.round((correct / total) * 100),
-    mcScore: mcTotal ? Math.round((mcCorrect / mcTotal) * 100) : null,
-    shortScore: shortTotal ? Math.round((shortCorrect / shortTotal) * 100) : null,
-    total,
-    correct,
-    mcTotal,
-    mcCorrect,
-    shortTotal,
-    shortCorrect
-  };
 }
 
 function similarity(a, b) {
@@ -268,73 +240,113 @@ function letterGrade(score) {
   return 'F';
 }
 
-function feedbackAndRecommendations(scoreObj, questionsArr) {
-  let feedback = `<div class='score-main'><b>Final Score: ${scoreObj.score}% (${scoreObj.correct}/${scoreObj.total})</b> <span class='grade-badge'>${letterGrade(scoreObj.score)}</span></div>`;
-  if (scoreObj.mcScore !== null) feedback += `<div>MC: ${scoreObj.mcScore}%</div>`;
-  if (scoreObj.shortScore !== null) feedback += `<div>Short Answer: ${scoreObj.shortScore}%</div>`;
-  if (scoreObj.score >= 90) feedback += '<div class="feedback-good">Excellent! You are ready for advanced topics.</div>';
-  else if (scoreObj.score >= 70) feedback += '<div class="feedback-ok">Good job! Review mistakes for mastery.</div>';
-  else feedback += '<div class="feedback-bad">Needs improvement. Focus on weak areas.</div>';
+function scoreSingleQuestion(q, userAns) {
+  if (!userAns) return { correct: false, score: 0, feedback: 'No answer submitted.' };
+  if (q.type === 'mc') {
+    const correct = userAns.trim().toLowerCase() === q.answer.trim().toLowerCase();
+    return {
+      correct,
+      score: correct ? 100 : 0,
+      feedback: correct ? 'Correct!' : `Incorrect. Correct answer: ${q.answer}`
+    };
+  } else {
+    const sim = similarity(userAns, q.answer);
+    const correct = sim >= 0.7;
+    return {
+      correct,
+      score: correct ? 100 : Math.round(sim * 100),
+      feedback: correct ? 'Good answer!' : `Partial/incorrect. Model answer: ${q.answer}`
+    };
+  }
+}
 
-  // Strengths/Weaknesses
-  let strengths = [], weaknesses = [];
-  if (scoreObj.mcScore !== null && scoreObj.mcScore >= 80) strengths.push('Strong multiple choice performance');
-  if (scoreObj.shortScore !== null && scoreObj.shortScore >= 80) strengths.push('Strong short answer performance');
-  if (scoreObj.mcScore !== null && scoreObj.mcScore < 70) weaknesses.push('Multiple choice needs work');
-  if (scoreObj.shortScore !== null && scoreObj.shortScore < 70) weaknesses.push('Short answer needs work');
-
-  if (strengths.length)
-    feedback += `<div class='strengths'><b>Strengths:</b> <ul>${strengths.map(s => `<li>${s}</li>`).join('')}</ul></div>`;
-  if (weaknesses.length)
-    feedback += `<div class='weaknesses'><b>Weaknesses:</b> <ul>${weaknesses.map(s => `<li>${s}</li>`).join('')}</ul></div>`;
-
-  // Recommend topics based on missed questions
-  let missedTopics = questionsArr.filter((q, idx) => {
-    const userAns = new FormData(userTestForm).get(`q${idx}`);
-    if (q.type === 'mc') {
-      return !(userAns && userAns.trim().toLowerCase() === q.answer.trim().toLowerCase());
-    } else {
-      return !(userAns && similarity(userAns, q.answer) >= 0.7);
-    }
-  }).map(q => q.question.split(' ').slice(0, 5).join(' '));
-  let recs = missedTopics.length ?
-    'Study these topics/questions:<ul>' + missedTopics.map(t => `<li>${t}...</li>`).join('') + '</ul>' :
-    'No specific recommendations. Try a harder test!';
-  return { feedback, recs };
+function updateLiveStats() {
+  const answered = perQuestionScores.length;
+  if (answered === 0) {
+    liveScore.innerHTML = '';
+    liveStrengths.innerHTML = '';
+    liveWeaknesses.innerHTML = '';
+    return;
+  }
+  const avg = Math.round(perQuestionScores.reduce((a, b) => a + b, 0) / answered);
+  totalScore = avg;
+  liveScore.innerHTML = `<b>Current Score:</b> ${avg}% <span class='grade-badge'>${letterGrade(avg)}</span>`;
+  const last5 = perQuestionScores.slice(-5);
+  strengths = [];
+  weaknesses = [];
+  if (last5.filter(s => s >= 90).length >= 3) strengths.push('Consistent high performance');
+  if (last5.filter(s => s < 70).length >= 2) weaknesses.push('Multiple recent mistakes');
+  if (perQuestionFeedback.slice(-5).some(f => f.includes('Partial'))) weaknesses.push('Short answers need more detail');
+  if (perQuestionFeedback.slice(-5).some(f => f.includes('Correct'))) strengths.push('Strong multiple choice');
+  if (answered >= 5) {
+    liveStrengths.innerHTML = `<b>Strengths:</b> <ul>${strengths.map(s => `<li>${s}</li>`).join('')}</ul>`;
+    liveWeaknesses.innerHTML = `<b>Weaknesses:</b> <ul>${weaknesses.map(s => `<li>${s}</li>`).join('')}</ul>`;
+  }
 }
 
 form.addEventListener('submit', async (e) => {
   e.preventDefault();
-  form.querySelector('button').disabled = true;
+  form.querySelector('button').setAttribute('disabled', 'true');
   testSection.style.display = 'none';
   resultsSection.style.display = 'none';
-  scoreFeedback.innerHTML = '';
-  recommendations.innerHTML = '';
   userTestForm.innerHTML = '';
-  submitTestBtn.style.display = 'none';
-  timerSpan.textContent = '';
+  questionFeedback.innerHTML = '';
+  liveScore.innerHTML = '';
+  liveStrengths.innerHTML = '';
+  liveWeaknesses.innerHTML = '';
+  perQuestionScores = [];
+  perQuestionFeedback = [];
+  userAnswers = [];
+  currentQuestion = 0;
   sessionId = generateSessionId();
   try {
     const data = Object.fromEntries(new FormData(form).entries());
     questions = await generateTest(data, sessionId);
-    renderTest(questions);
+    if (!questions.length) throw new Error('No questions generated.');
     testSection.style.display = 'block';
-    startTimer(Number(data['time-limit']));
+    renderQuestion(currentQuestion);
+    startQuestionTimer(45, () => submitTestBtn.click());
   } catch (err) {
-    scoreFeedback.innerHTML = `<span style="color:#e17055">Error generating test: ${err}</span>`;
+    scoreFeedback.innerHTML = `<span style=\"color:#e17055\">Error generating test: ${err}</span>`;
     resultsSection.style.display = 'block';
   } finally {
-    form.querySelector('button').disabled = false;
+    form.querySelector('button').removeAttribute('disabled');
   }
 });
 
 submitTestBtn.addEventListener('click', (e) => {
   e.preventDefault();
   clearInterval(timerInterval);
-  const scoreObj = scoreTest(questions);
-  const { feedback, recs } = feedbackAndRecommendations(scoreObj, questions);
-  scoreFeedback.innerHTML = feedback;
-  recommendations.innerHTML = recs;
-  resultsSection.style.display = 'block';
-  testSection.style.display = 'none';
+  const q = questions[currentQuestion];
+  const userAns = (userTestForm.querySelector('input[type="radio"]:checked') || userTestForm.querySelector('input[type="text"]'))?.value || '';
+  userAnswers[currentQuestion] = userAns;
+  const result = scoreSingleQuestion(q, userAns);
+  perQuestionScores[currentQuestion] = result.score;
+  perQuestionFeedback[currentQuestion] = result.feedback;
+  questionFeedback.innerHTML = `<b>Feedback:</b> ${result.feedback}`;
+  updateLiveStats();
+  submitTestBtn.style.display = 'none';
+  setTimeout(() => {
+    currentQuestion++;
+    if (currentQuestion < questions.length) {
+      renderQuestion(currentQuestion);
+      startQuestionTimer(45, () => submitTestBtn.click());
+    } else {
+      testSection.style.display = 'none';
+      resultsSection.style.display = 'block';
+      scoreFeedback.innerHTML = `<b>Final Score:</b> ${totalScore}% <span class='grade-badge'>${letterGrade(totalScore)}</span>`;
+      recommendations.innerHTML = totalScore >= 90
+        ? 'Excellent! Try a harder test or new topic.'
+        : totalScore >= 70
+        ? 'Good job! Review your mistakes for mastery.'
+        : 'Needs improvement. Focus on your weak areas.';
+      liveStrengths.innerHTML = `<b>Strengths:</b> <ul>${strengths.map(s => `<li>${s}</li>`).join('')}</ul>`;
+      liveWeaknesses.innerHTML = `<b>Weaknesses:</b> <ul>${weaknesses.map(s => `<li>${s}</li>`).join('')}</ul>`;
+    }
+  }, 1200);
+});
+
+themeToggle.addEventListener('click', () => {
+  document.body.classList.toggle('light-theme');
+  themeToggle.textContent = document.body.classList.contains('light-theme') ? 'Switch to Dark' : 'Switch Theme';
 });

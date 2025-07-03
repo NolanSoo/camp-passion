@@ -100,6 +100,80 @@ input:focus, textarea:focus {
   font-size: 1.1rem;
 }
 
+#loading-overlay {
+  position: fixed;
+  z-index: 9999;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(30,32,34,0.92);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  transition: opacity 0.3s;
+}
+#loading-overlay.hidden {
+  display: none;
+}
+.loader {
+  border: 8px solid #23272f;
+  border-top: 8px solid #00cec9;
+  border-radius: 50%;
+  width: 60px;
+  height: 60px;
+  animation: spin 1s linear infinite;
+  margin-bottom: 1.5rem;
+}
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+.loading-text {
+  color: #fff;
+  font-size: 1.2rem;
+  font-weight: 600;
+}
+.theme-toggle-row {
+  text-align: right;
+  margin-top: 1rem;
+}
+body.light-theme {
+  background: linear-gradient(120deg, #f5f6fa 0%, #dfe6e9 100%);
+  color: #232526;
+}
+body.light-theme .card {
+  background: #fff;
+  color: #232526;
+}
+body.light-theme .primary-btn {
+  background: linear-gradient(90deg, #0984e3 0%, #00b894 100%);
+}
+body.light-theme .primary-btn:hover {
+  background: linear-gradient(90deg, #00b894 0%, #0984e3 100%);
+}
+body.light-theme .loader {
+  border: 8px solid #dfe6e9;
+  border-top: 8px solid #0984e3;
+}
+.score-main {
+  font-size: 1.3rem;
+  margin-bottom: 0.5rem;
+}
+.grade-badge {
+  background: #00cec9;
+  color: #232526;
+  border-radius: 0.5rem;
+  padding: 0.2rem 0.7rem;
+  margin-left: 0.5rem;
+  font-weight: 700;
+}
+.feedback-good { color: #00b894; }
+.feedback-ok { color: #fdcb6e; }
+.feedback-bad { color: #e17055; }
+.strengths ul, .weaknesses ul { margin: 0.3rem 0 0.7rem 1.2rem; }
+#question-feedback { margin: 1rem 0 0.5rem 0; font-size: 1.1rem; }
+#live-score { font-size: 1.1rem; margin-bottom: 0.5rem; }
+#live-strengths, #live-weaknesses { margin-top: 1rem; }
+
 @media (max-width: 600px) {
   .card {
     padding: 1.2rem 0.7rem;
