@@ -575,6 +575,152 @@ function selectStudyMode(event) {
 }
 
 // --- EVENT LISTENERS ---
+// --- SHOW QUESTION FUNCTION ---
+// --- ADVANCED SHOW QUESTION FUNCTION (restores all features) ---
+function showQuestion() {
+  if (!quizData || !quizData.length || currentQuestion >= quizData.length) {
+    showResults();
+    return;
+  }
+  // Clear previous content
+  userTestForm.innerHTML = '';
+  questionFeedback.innerHTML = '';
+  liveScore.innerHTML = '';
+  submitTestBtn.style.display = 'block';
+  // Get current question
+  const q = quizData[currentQuestion];
+  questionNumberSpan.textContent = `${currentQuestion + 1} / ${quizData.length}`;
+  // Timer logic (study mode aware))
+  if (timer) clearInterval(timer);
+  let baseTime = 45;
+  if (studyMode && STUDY_MODES[studyMode] && STUDY_MODES[studyMode].effect.timeMultiplier !== undefined) {
+    baseTime = Math.round(baseTime * STUDY_MODES[studyMode].effect.timeMultiplier);
+    if (baseTime === 0) baseTime = 9999; // Practice mode: no time limit
+  }
+  timeLeft = baseTime;
+  timerSpan.textContent = `⏰ ${Math.floor(timeLeft/60)}:${(timeLeft%60).toString().padStart(2,'0')}`;
+  if (baseTime < 9999) {
+    timer = setInterval(() => {
+      timeLeft--;
+      const min = Math.floor(timeLeft / 60);
+      const sec = timeLeft % 60;
+      timerSpan.textContent = `⏰ ${min}:${sec.toString().padStart(2, '0')}`;
+      if (timeLeft <= 0) {
+        clearInterval(timer);
+        submitTestBtn.click();
+      }
+    }, 1000);
+  } else {
+    timerSpan.textContent = '⏰ No time limit';
+  }
+  // Render question
+  const wrapper = document.createElement('div');
+  wrapper.className = 'form-row';
+  const label = document.createElement('label');
+  label.textContent = memeMode ? `💀 ${q.question}` : q.question;
+  wrapper.appendChild(label);
+  if (q.type === 'mc' && q.options) {
+    q.options.forEach((opt, i) => {
+      const optId = `q${currentQuestion}_opt${i}`;
+      const radio = document.createElement('input');
+      radio.type = 'radio';
+      radio.name = `q${currentQuestion}`;
+      radio.value = opt;
+      radio.id = optId;
+      const optLabel = document.createElement('label');
+      optLabel.htmlFor = optId;
+      optLabel.textContent = opt;
+      wrapper.appendChild(radio);
+      wrapper.appendChild(optLabel);
+    });
+  } else {
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.name = `q${currentQuestion}`;
+    input.placeholder = memeMode ? 'Drop the sauce...' : 'Your answer';
+    wrapper.appendChild(input);
+  }
+  userTestForm.appendChild(wrapper);
+  // Show submit button
+  submitTestBtn.style.display = 'block';
+  // Attach submit handler for this question
+  submitTestBtn.onclick = async function (e) {
+    e.preventDefault();
+    if (timer) clearInterval(timer);
+    let userAns = '';
+    if (q.type === 'mc') {
+      const checked = userTestForm.querySelector('input[type="radio"]:checked');
+      userAns = checked ? checked.value : '';
+    } else {
+      const input = userTestForm.querySelector('input[type="text"]');
+      userAns = input ? input.value : '';
+    }
+    // Grading logic: partial credit, negative points, meme mode, streaks, analytics
+    let correct = false;
+    let feedback = '';
+    let points = 0;
+    if (q.type === 'mc') {
+      if (q.correct && q.correct.includes(userAns)) {
+        correct = true;
+        points = 3 * pointMultiplier;
+        feedback = memeMode ? 'W answer, giga-brain 🧠' : 'Correct!';
+      } else if (q.options && q.options.includes(userAns)) {
+        // Partial credit for plausible answers
+        const plausible = q.options.filter(opt => !q.correct.includes(opt));
+        if (plausible.includes(userAns)) {
+          points = 1 * pointMultiplier;
+          feedback = memeMode ? 'Mid but valid (partial credit)' : 'Partial credit.';
+        } else {
+          points = -1;
+          feedback = memeMode ? 'Skill issue 💀' : 'Incorrect.';
+        }
+      } else {
+        points = -1;
+        feedback = memeMode ? 'Skill issue 💀' : 'Incorrect.';
+      }
+    } else {
+      // Short answer: check similarity (basic)
+      const ans = (q.answer || '').toLowerCase();
+      const user = (userAns || '').toLowerCase();
+      if (ans && user && (user === ans || ans.includes(user) || user.includes(ans))) {
+        correct = true;
+        points = 3 * pointMultiplier;
+        feedback = memeMode ? 'Bussin answer 🔥' : 'Good answer!';
+      } else if (user && ans && user.length > 0 && ans.length > 0) {
+        points = 1 * pointMultiplier;
+        feedback = memeMode ? 'Kinda mid, but you tried' : `Partial: Model answer: ${q.answer}`;
+      } else {
+        points = -1;
+        feedback = memeMode ? 'Skill issue 💀' : `Model answer: ${q.answer}`;
+      }
+    }
+    // Update score, streak, analytics
+    score += points;
+    if (correct) {
+      streak++;
+      showToast(memeMode ? '🔥 Streak up! ' + streak : `Streak: ${streak}`);
+    } else {
+      streak = 0;
+    }
+    // Live score and feedback
+    liveScore.innerHTML = `<b>Score:</b> ${score} <span class='grade-badge'>${score >= 0 ? '👍' : '👎'}</span> <b>Streak:</b> ${streak}`;
+    questionFeedback.innerHTML = `<b>Feedback:</b> ${feedback}`;
+    // Power-ups unlock
+    if (streak > 0 && streak % 3 === 0) {
+      showPowerUpsModal();
+    }
+    // Study mode modal after 5 questions
+    if (currentQuestion === 4 && !studyMode) {
+      showStudyModeModal();
+    }
+    // Next question after short delay
+    submitTestBtn.style.display = 'none';
+    setTimeout(() => {
+      currentQuestion++;
+      showQuestion();
+    }, 1200);
+  };
+}
 if (testForm) {
   testForm.addEventListener('submit', async (e) => {
     e.preventDefault();
