@@ -81,6 +81,17 @@ const STUDY_TIPS = [
   "Tip: Consistency beats cramming.",
 ]
 
+const MEME_OPTIONS = [
+  "skibidi toilet answer (real)",
+  "ohio moment fr fr",
+  "rizz level: infinite",
+  "certified skill issue",
+  "NPC behavior detected",
+  "touch grass",
+  "based and redpilled",
+  "it's giving...",
+]
+
 // --- DOM ELEMENTS ---
 const inputFormSection = document.getElementById("input-form")
 const testSection = document.getElementById("test-section")
@@ -101,7 +112,7 @@ const liveWeaknessesEl = document.getElementById("live-weaknesses")
 const loadingOverlay = document.getElementById("loading-overlay")
 const loadingTip = document.getElementById("loading-tip")
 const themeToggle = document.getElementById("theme-toggle")
-const memeToggle = document.getElementById("meme-mode-toggle")
+let memeToggle // Will be created dynamically
 
 // --- GLOBAL STATE ---
 let state = {}
@@ -119,7 +130,7 @@ function resetState() {
     timerInterval: null,
     timeLeft: 0,
     sessionId: `session_${Date.now()}`,
-    memeMode: false,
+    // memeMode is preserved across resets
     settings: {},
   }
   questionTracker.clearSession(state.sessionId)
@@ -181,44 +192,52 @@ async function makeApiCall(prompt) {
 async function generateQuiz(settings) {
   const recentQs = questionTracker.getRecentQuestions(state.sessionId).join(" | ")
   const prompt = `Generate a test with these parameters:
-        Topic: ${settings.topic}, Grade: ${settings["grade-level"]}, Subject: ${settings.subject}
-        Description: ${settings.description}
-        # of Questions: ${settings["num-questions"]}
-        % Short Answer: ${settings["short-answer"]}
-        Avoid repeating these questions: ${recentQs || "None"}
-        Return as a JSON array of questions. Each question must have:
-        - type: "mc" or "short"
-        - question: string
-        - (for mc) options: array of 4 strings
-        - (for mc) answer: the correct option string
-        - (for short) answer: a detailed model answer string
-        - topic: specific sub-topic string
-        - explanation: string explaining the correct answer.`
+          Topic: ${settings.topic}, Grade: ${settings["grade-level"]}, Subject: ${settings.subject}
+          Description: ${settings.description}
+          # of Questions: ${settings["num-questions"]}
+          % Short Answer: ${settings["short-answer"]}
+          Avoid repeating these questions: ${recentQs || "None"}
+          Return as a JSON array of questions. Each question must have:
+          - type: "mc" or "short"
+          - question: string
+          - (for mc) options: array of 4 strings
+          - (for mc) answer: the correct option string
+          - (for short) answer: a detailed model answer string
+          - topic: specific sub-topic string
+          - explanation: string explaining the correct answer.`
   return makeApiCall(prompt)
 }
 
 async function evaluateShortAnswer(question, userAnswer, modelAnswer) {
   const prompt = `Evaluate a user's short answer.
-        Question: "${question}"
-        Model Answer: "${modelAnswer}"
-        User's Answer: "${userAnswer}"
-        Provide a score (0-100) and feedback.
-        Return as a JSON object: { "score": number, "feedback": "string with detailed analysis" }`
+          Question: "${question}"
+          Model Answer: "${modelAnswer}"
+          User's Answer: "${userAnswer}"
+          Provide a score (0-100) and feedback.
+          Return as a JSON object: { "score": number, "feedback": "string with detailed analysis" }`
   return makeApiCall(prompt)
 }
 
 async function getStudyRecommendations() {
   const summary = `User scored ${state.totalScore}%. 
-    Strengths: ${Array.from(state.strengths).join(", ")}. 
-    Weaknesses: ${Array.from(state.weaknesses).join(", ")}.`
+      Strengths: ${Array.from(state.strengths).join(", ")}. 
+      Weaknesses: ${Array.from(state.weaknesses).join(", ")}.`
   const prompt = `Based on this quiz performance summary, provide 2-3 actionable study recommendations.
-        Summary: ${summary}
-        Format as a JSON object: { "recommendations": "string with bullet points" }`
+          Summary: ${summary}
+          Format as a JSON object: { "recommendations": "string with bullet points" }`
   const result = await makeApiCall(prompt)
   return result.recommendations
 }
 
 // --- UI & QUIZ FLOW ---
+function showToast(message) {
+  const toast = document.createElement("div")
+  toast.className = "toast"
+  toast.textContent = message
+  document.body.appendChild(toast)
+  setTimeout(() => toast.remove(), 3000)
+}
+
 function showLoading(show) {
   if (show) {
     loadingTip.textContent = STUDY_TIPS[Math.floor(Math.random() * STUDY_TIPS.length)]
@@ -228,8 +247,31 @@ function showLoading(show) {
   }
 }
 
+function transformForMemeMode(q) {
+  const newQ = { ...q }
+  if (q.type === "mc") {
+    newQ.question = `🔥 ${q.question} (No Ls, only Ws)`
+    const memeOptions = [...MEME_OPTIONS].sort(() => 0.5 - Math.random()).slice(0, 2)
+    newQ.options = [
+      ...q.options.map((opt) => {
+        if (opt.toLowerCase() === q.answer.toLowerCase()) {
+          return `${opt} (no cap fr fr)`
+        }
+        return `${opt} (${Math.random() > 0.5 ? "mid but valid" : "💀"})`
+      }),
+      ...memeOptions,
+    ].sort(() => 0.5 - Math.random())
+    newQ.answer = `${q.answer} (no cap fr fr)`
+  } else {
+    newQ.question = `💀 ${q.question} (go giga-brain mode)`
+  }
+  return newQ
+}
+
 function renderQuestion(qIndex) {
-  const q = state.quizData[qIndex]
+  const originalQ = state.quizData[qIndex]
+  const q = state.memeMode ? transformForMemeMode(originalQ) : originalQ
+
   userTestForm.innerHTML = ""
   questionFeedback.innerHTML = ""
   aiFeedbackCard.style.display = "none"
@@ -245,24 +287,27 @@ function renderQuestion(qIndex) {
   if (q.type === "mc" && q.options) {
     q.options.forEach((opt, i) => {
       const optId = `q${qIndex}_opt${i}`
-      const radioDiv = document.createElement("div")
-      radioDiv.className = "mc-option"
-      const radio = document.createElement("input")
-      radio.type = "radio"
-      radio.name = `q${qIndex}`
-      radio.value = opt
-      radio.id = optId
-      const optLabel = document.createElement("label")
-      optLabel.htmlFor = optId
-      optLabel.textContent = opt
-      radioDiv.appendChild(radio)
-      radioDiv.appendChild(optLabel)
-      wrapper.appendChild(radioDiv)
+      const optionLabel = document.createElement("label")
+      optionLabel.className = "mc-option"
+      optionLabel.htmlFor = optId
+
+      const radioInput = document.createElement("input")
+      radioInput.type = "radio"
+      radioInput.name = `q${qIndex}`
+      radioInput.value = opt
+      radioInput.id = optId
+
+      const optionText = document.createElement("span")
+      optionText.textContent = opt
+
+      optionLabel.appendChild(radioInput)
+      optionLabel.appendChild(optionText)
+      wrapper.appendChild(optionLabel)
     })
   } else {
     const textarea = document.createElement("textarea")
     textarea.name = `q${qIndex}`
-    textarea.placeholder = "Your detailed answer..."
+    textarea.placeholder = state.memeMode ? "Drop the sauce..." : "Your detailed answer..."
     textarea.rows = 4
     wrapper.appendChild(textarea)
   }
@@ -320,9 +365,17 @@ async function showResults() {
           : state.totalScore >= 60
             ? "D"
             : state.totalScore >= 50
-            ? "F+"
-            : "F"
-  scoreFeedback.innerHTML = `<b>Final Score:</b> ${state.totalScore}% <span class='grade-badge'>${grade}</span>`
+              ? "F+"
+              : "F"
+
+  let scoreText = `<b>Final Score:</b> ${state.totalScore}% <span class='grade-badge'>${grade}</span>`
+  if (state.memeMode) {
+    scoreText =
+      state.totalScore >= 85
+        ? `👑 Giga-chad performance! You got ${state.totalScore}%`
+        : `💀 Skill issue... you got ${state.totalScore}%. Try again maybe?`
+  }
+  scoreFeedback.innerHTML = scoreText
 
   recommendationsContent.innerHTML = "Generating recommendations..."
   try {
@@ -380,7 +433,9 @@ async function handleAnswerSubmit(e) {
   clearInterval(state.timerInterval)
   submitTestBtn.style.display = "none"
 
-  const q = state.quizData[state.currentQuestionIndex]
+  const originalQ = state.quizData[state.currentQuestionIndex]
+  const q = state.memeMode ? transformForMemeMode(originalQ) : originalQ
+
   const userInput =
     (userTestForm.querySelector('input[type="radio"]:checked') || userTestForm.querySelector("textarea"))?.value || ""
   state.userAnswers[state.currentQuestionIndex] = userInput
@@ -390,12 +445,16 @@ async function handleAnswerSubmit(e) {
   if (q.type === "mc") {
     const isCorrect = userInput.toLowerCase() === q.answer.toLowerCase()
     result.score = isCorrect ? 100 : 0
-    result.feedback = isCorrect ? "Correct!" : `Incorrect. The right answer is: ${q.answer}`
-    questionFeedback.innerHTML = `<b>Feedback:</b> ${result.feedback}<br><em>${q.explanation}</em>`
+    if (state.memeMode) {
+      result.feedback = isCorrect ? "W answer, giga-brain 🧠" : "Skill issue 💀"
+    } else {
+      result.feedback = isCorrect ? "Correct!" : `Incorrect. The right answer is: ${originalQ.answer}`
+    }
+    questionFeedback.innerHTML = `<b>Feedback:</b> ${result.feedback}<br><em>${originalQ.explanation}</em>`
   } else {
     questionFeedback.textContent = "AI is evaluating your answer..."
     try {
-      result = await evaluateShortAnswer(q.question, userInput, q.answer)
+      result = await evaluateShortAnswer(q.question, userInput, originalQ.answer)
       questionFeedback.innerHTML = `<b>Feedback:</b> Evaluation finished.`
       aiFeedbackContent.innerHTML = `<p><strong>Score:</strong> ${result.score}%</p><p>${result.feedback}</p>`
       aiFeedbackCard.style.display = "block"
@@ -410,8 +469,8 @@ async function handleAnswerSubmit(e) {
   state.feedbacks[state.currentQuestionIndex] = result.feedback
 
   // Update strengths/weaknesses
-  if (result.score >= 85) state.strengths.add(q.topic)
-  else state.weaknesses.add(q.topic)
+  if (result.score >= 85) state.strengths.add(originalQ.topic)
+  else state.weaknesses.add(originalQ.topic)
   updateLiveStats()
 
   setTimeout(
@@ -432,17 +491,34 @@ function handleThemeToggle() {
   themeToggle.textContent = document.body.classList.contains("light-theme") ? "Switch to Dark" : "Switch Theme"
 }
 
+function handleMemeToggle() {
+  state.memeMode = !state.memeMode
+  document.body.classList.toggle("meme-mode", state.memeMode)
+  showToast(state.memeMode ? "Meme Mode: ON 💀" : "Meme Mode: OFF")
+}
+
 // --- INITIALIZATION ---
 function init() {
+  // Create and add meme toggle button
+  const themeRow = document.querySelector(".theme-toggle-row")
+  if (themeRow) {
+    memeToggle = document.createElement("button")
+    memeToggle.id = "meme-mode-toggle"
+    memeToggle.className = "primary-btn"
+    memeToggle.textContent = "Toggle Memes"
+    memeToggle.style.marginLeft = "1rem"
+    themeRow.appendChild(memeToggle)
+    memeToggle.addEventListener("click", handleMemeToggle)
+  }
+
   testForm.addEventListener("submit", handleFormSubmit)
   submitTestBtn.addEventListener("click", handleAnswerSubmit)
   themeToggle.addEventListener("click", handleThemeToggle)
-  // Meme toggle is just for show in this version, full logic can be re-added
-  memeToggle.addEventListener("click", () => {
-    state.memeMode = !state.memeMode
-    alert("Meme mode logic is being refactored! Stay tuned.")
-  })
+
   resetState()
+  // Set initial meme mode state to false
+  state.memeMode = false
+  document.body.classList.remove("meme-mode")
 }
 
 init()

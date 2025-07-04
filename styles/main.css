@@ -568,29 +568,24 @@ body.light-theme .styled-select {
 
 /* Question Styles */
 .mc-option {
-  display: flex;
-  align-items: center;
+  display: block;
   padding: 1rem;
   margin: 0.8rem 0;
   border: 2px solid #4a5568;
   border-radius: 0.8rem;
   background: #2d3748;
+  color: #f5f6fa; /* Explicitly set color for dark mode visibility */
   cursor: pointer;
   transition: all 0.3s ease;
+  position: relative;
 }
 
-.mc-option:hover {
-  border-color: #48bb78;
-  background: #2f855a1a;
-}
-
-.mc-option:focus-within {
-  border-color: #00cec9;
-  background: #00cec91a;
-}
-
-.mc-option input[type="checkbox"] {
-  margin-right: 1rem;
+/* Visually hide the radio button but keep it accessible */
+.mc-option input[type="radio"] {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
 }
 
 /* Meme Mode Styles */
@@ -812,4 +807,120 @@ body.light-theme .ai-feedback-card {
 #recommendations-content {
   font-size: 1rem;
   line-height: 1.6;
+}
+
+/* Style for the selected option using modern CSS */
+.mc-option:has(input:checked) {
+  border-color: #00cec9;
+  background: rgba(0, 206, 201, 0.15);
+}
+
+/* Light theme overrides for MC options */
+body.light-theme .mc-option {
+  background: #f0f2f5;
+  border-color: #dfe6e9;
+  color: #232526;
+}
+
+body.light-theme .mc-option:hover {
+  background: #e4e6e9;
+}
+
+body.light-theme .mc-option:has(input:checked) {
+  border-color: #0984e3;
+  background: rgba(9, 132, 227, 0.1);
+}
+
+/* --- MEME MODE STYLES --- */
+.meme-mode .card {
+  border: 3px solid;
+  border-image: linear-gradient(45deg, #ff6b6b, #4ecdc4, #45b7d1, #96c93d) 1;
+  animation: borderGlow 2s infinite alternate;
+}
+
+@keyframes borderGlow {
+  from {
+    border-image: linear-gradient(45deg, #ff6b6b, #4ecdc4, #45b7d1, #96c93d) 1;
+  }
+  to {
+    border-image: linear-gradient(135deg, #96c93d, #ff6b6b, #4ecdc4, #45b7d1) 1;
+  }
+}
+
+.meme-mode .primary-btn,
+.meme-mode .power-up-btn {
+  font-family: "Comic Sans MS", "Chalkduster", "Bradley Hand", cursive;
+  transform: rotate(-1deg);
+  transition: transform 0.2s ease;
+}
+
+.meme-mode .primary-btn:hover,
+.meme-mode .power-up-btn:hover {
+  transform: rotate(1deg) scale(1.05);
+}
+
+.meme-mode .mc-option {
+  transform: rotate(-0.5deg);
+}
+
+.meme-mode .mc-option:nth-child(even) {
+  transform: rotate(0.5deg);
+}
+
+.meme-mode .toast {
+  font-family: "Comic Sans MS", "Chalkduster", "Bradley Hand", cursive;
+  background: linear-gradient(45deg, #ff6b6b, #4ecdc4);
+  font-size: 1.2em;
+  transform: rotate(2deg);
+}
+
+.meme-mode h1,
+.meme-mode h2 {
+  animation: text-flicker 3s linear infinite;
+}
+
+@keyframes text-flicker {
+  0% {
+    opacity: 0.8;
+    text-shadow: 2px 2px 5px #ff6b6b;
+  }
+  2% {
+    opacity: 1;
+    text-shadow: 2px 2px 5px #4ecdc4;
+  }
+  8% {
+    opacity: 0.7;
+    text-shadow: -2px -2px 5px #45b7d1;
+  }
+  9% {
+    opacity: 1;
+    text-shadow: 2px -2px 5px #96c93d;
+  }
+  12% {
+    opacity: 0.6;
+  }
+  20% {
+    opacity: 1;
+    text-shadow: 2px 2px 5px #ff6b6b;
+  }
+  25% {
+    opacity: 0.5;
+  }
+  30% {
+    opacity: 1;
+    text-shadow: -2px 2px 5px #4ecdc4;
+  }
+  70% {
+    opacity: 1;
+  }
+  72% {
+    opacity: 0.4;
+  }
+  77% {
+    opacity: 1;
+    text-shadow: 2px 2px 5px #45b7d1;
+  }
+  100% {
+    opacity: 1;
+  }
 }
