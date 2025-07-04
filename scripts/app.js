@@ -121,18 +121,170 @@ let state = {}
 
 // --- POWER-UP SYSTEM ---
 const POWER_UPS = {
-  "extra-time": { name: "Extra Time", icon: "⏰", cost: 0, description: "Add 15 seconds to current question" },
-  skip: { name: "Skip Question", icon: "⏭️", cost: 0, description: "Skip current question (50% credit)" },
-  hint: { name: "Get Hint", icon: "💡", cost: 0, description: "Get an AI-generated hint" },
+  "extra-time": { name: "Extra Time", icon: "⏰", cost: 2, description: "Add 15 seconds to current question" },
+  skip: { name: "Skip Question", icon: "⏭️", cost: 3, description: "Skip current question (50% credit)" },
+  hint: { name: "Get Hint", icon: "💡", cost: 1, description: "Get an AI-generated hint" },
+  "double-points": { name: "Double Points", icon: "💎", cost: 4, description: "Next question worth 2x points" },
+  "freeze-timer": { name: "Freeze Timer", icon: "❄️", cost: 3, description: "Pause timer for 10 seconds" },
+  "fifty-fifty": { name: "50/50", icon: "🎯", cost: 2, description: "Eliminate 2 wrong answers (MC only)" },
+  "second-chance": { name: "Second Chance", icon: "🔄", cost: 5, description: "Retry question if wrong" },
+  "lucky-guess": { name: "Lucky Guess", icon: "🍀", cost: 6, description: "Auto-correct next MC question" },
+  "time-boost": { name: "Time Boost", icon: "⚡", cost: 3, description: "Start next question with +30 seconds" },
+  shield: { name: "Shield", icon: "🛡️", cost: 4, description: "Protect from point loss on next wrong answer" },
 }
 
 function initializePowerUps() {
   state.powerUps = {
-    "extra-time": 1, // Start with 1 of each
-    skip: 1,
-    hint: 1,
+    "extra-time": 0,
+    skip: 0,
+    hint: 1, // Start with 1 free hint
+    "double-points": 0,
+    "freeze-timer": 0,
+    "fifty-fifty": 0,
+    "second-chance": 0,
+    "lucky-guess": 0,
+    "time-boost": 0,
+    shield: 0,
+  }
+  state.coins = 5 // Start with 5 coins
+  state.activeEffects = {
+    doublePoints: false,
+    timeBoost: false,
+    shield: false,
+    luckyGuess: false,
+    secondChance: false,
   }
   updatePowerUpDisplay()
+  updateCoinsDisplay()
+}
+
+function updateCoinsDisplay() {
+  let coinsDisplay = document.getElementById("coins-display")
+  if (!coinsDisplay) {
+    coinsDisplay = document.createElement("div")
+    coinsDisplay.id = "coins-display"
+    coinsDisplay.className = "coins-display"
+    const powerUpsSection = document.getElementById("power-ups-section")
+    if (powerUpsSection) {
+      powerUpsSection.insertBefore(coinsDisplay, powerUpsSection.firstChild)
+    }
+  }
+  coinsDisplay.innerHTML = `<span class="coins-icon">🪙</span> <strong>${state.coins || 0}</strong> coins`
+}
+
+function earnCoins(score) {
+  const coinsEarned = Math.round(score) / 100 // 100% = 1 coin, 50% = 0.5 coins, etc.
+  state.coins = (state.coins || 0) + coinsEarned
+  updateCoinsDisplay()
+  if (coinsEarned > 0) {
+    showToast(`🪙 Earned ${coinsEarned} coins!`)
+  }
+}
+
+function canAffordPowerUp(powerType) {
+  const cost = POWER_UPS[powerType].cost
+  return (state.coins || 0) >= cost
+}
+
+function buyPowerUp(powerType) {
+  const cost = POWER_UPS[powerType].cost
+  if (!canAffordPowerUp(powerType)) {
+    showToast(`Not enough coins! Need ${cost} coins.`)
+    return false
+  }
+
+  state.coins -= cost
+  updateCoinsDisplay()
+  return true
+}
+
+function useExtraTime() {
+  state.timeLeft += 15
+  updateTimerDisplay()
+  showToast("⏰ Extra 15 seconds added!")
+}
+
+function skipQuestion() {
+  const originalQ = state.quizData[state.currentQuestionIndex]
+  const score = originalQ.type === "mc" ? 50 : 0
+  state.scores[state.currentQuestionIndex] = score
+  state.userAnswers[state.currentQuestionIndex] = "Skipped"
+  state.currentQuestionIndex++
+  renderQuestion(state.currentQuestionIndex)
+  showToast("⏭️ Question skipped!")
+}
+
+function useHint() {
+  const originalQ = state.quizData[state.currentQuestionIndex]
+  const hint = `Hint: ${originalQ.explanation}`
+  questionFeedback.innerHTML = `<b>Hint:</b> ${hint}`
+  showToast("💡 Hint received!")
+}
+
+function useDoublePoints() {
+  state.activeEffects.doublePoints = true
+  showToast("💎 Next question worth DOUBLE points!")
+}
+
+function useFreezeTimer() {
+  const originalTimeLeft = state.timeLeft
+  clearInterval(state.timerInterval)
+  showToast("❄️ Timer frozen for 10 seconds!")
+
+  setTimeout(() => {
+    state.timeLeft = originalTimeLeft
+    startTimer(state.timeLeft, () => submitTestBtn.click())
+  }, 10000)
+}
+
+function useFiftyFifty() {
+  const originalQ = state.quizData[state.currentQuestionIndex]
+  if (originalQ.type !== "mc") {
+    showToast("🎯 50/50 only works on multiple choice questions!")
+    return false
+  }
+
+  const options = userTestForm.querySelectorAll(".mc-option")
+  const correctAnswer = originalQ.answer.toLowerCase()
+  const wrongOptions = []
+
+  options.forEach((option) => {
+    const input = option.querySelector("input")
+    if (input.value.toLowerCase() !== correctAnswer) {
+      wrongOptions.push(option)
+    }
+  })
+
+  // Remove 2 wrong options
+  for (let i = 0; i < Math.min(2, wrongOptions.length); i++) {
+    wrongOptions[i].style.opacity = "0.3"
+    wrongOptions[i].style.pointerEvents = "none"
+    const input = wrongOptions[i].querySelector("input")
+    input.disabled = true
+  }
+
+  showToast("🎯 Eliminated 2 wrong answers!")
+  return true
+}
+
+function useSecondChance() {
+  state.activeEffects.secondChance = true
+  showToast("🔄 You'll get a second chance if you answer wrong!")
+}
+
+function useLuckyGuess() {
+  state.activeEffects.luckyGuess = true
+  showToast("🍀 Next MC question will be auto-corrected!")
+}
+
+function useTimeBoost() {
+  state.activeEffects.timeBoost = true
+  showToast("⚡ Next question starts with +30 seconds!")
+}
+
+function useShield() {
+  state.activeEffects.shield = true
+  showToast("🛡️ Protected from point loss on next wrong answer!")
 }
 
 function updatePowerUpDisplay() {
@@ -144,25 +296,42 @@ function updatePowerUpDisplay() {
 
   buttons.forEach((btn) => {
     const powerType = btn.dataset.power
-    const available = state.powerUps[powerType] || 0
-
-    btn.disabled = available <= 0
-    btn.classList.toggle("available", available > 0)
-    btn.classList.toggle("disabled", available <= 0)
-
-    // Update button text to show count
     const powerUp = POWER_UPS[powerType]
-    btn.innerHTML = `${powerUp.icon} ${powerUp.name} (${available})`
+    if (!powerUp) return
+
+    const available = state.powerUps[powerType] || 0
+    const canAfford = canAffordPowerUp(powerType)
+    const isAffordable = canAfford || available > 0
+
+    btn.disabled = !isAffordable
+    btn.classList.toggle("available", isAffordable)
+    btn.classList.toggle("disabled", !isAffordable)
+    btn.classList.toggle("owned", available > 0)
+
+    // Update button text to show cost or owned count
+    if (available > 0) {
+      btn.innerHTML = `${powerUp.icon} ${powerUp.name} (${available})`
+    } else {
+      btn.innerHTML = `${powerUp.icon} ${powerUp.name} (${powerUp.cost}🪙)`
+    }
   })
+
+  updateCoinsDisplay()
 }
 
 function usePowerUp(powerType) {
-  if (!state.powerUps[powerType] || state.powerUps[powerType] <= 0) {
-    showToast("No power-ups of this type available!")
-    return false
+  const available = state.powerUps[powerType] || 0
+
+  // If we own the power-up, use it directly
+  if (available > 0) {
+    state.powerUps[powerType]--
+  } else {
+    // Otherwise, try to buy it
+    if (!buyPowerUp(powerType)) {
+      return false
+    }
   }
 
-  state.powerUps[powerType]--
   updatePowerUpDisplay()
 
   switch (powerType) {
@@ -175,101 +344,51 @@ function usePowerUp(powerType) {
     case "hint":
       useHint()
       break
+    case "double-points":
+      useDoublePoints()
+      break
+    case "freeze-timer":
+      useFreezeTimer()
+      break
+    case "fifty-fifty":
+      if (!useFiftyFifty()) {
+        // Refund if it didn't work
+        if (available > 0) {
+          state.powerUps[powerType]++
+        } else {
+          state.coins += POWER_UPS[powerType].cost
+        }
+        updatePowerUpDisplay()
+      }
+      break
+    case "second-chance":
+      useSecondChance()
+      break
+    case "lucky-guess":
+      useLuckyGuess()
+      break
+    case "time-boost":
+      useTimeBoost()
+      break
+    case "shield":
+      useShield()
+      break
   }
 
   return true
 }
 
-function useExtraTime() {
-  state.timeLeft += 15
-  updateTimerDisplay()
-  showToast("⏰ +15 seconds added!")
-}
-
-function skipQuestion() {
-  clearInterval(state.timerInterval)
-
-  // Give 50% credit for skipping
-  const originalQ = state.quizData[state.currentQuestionIndex]
-  state.scores[state.currentQuestionIndex] = 50
-  state.feedbacks[state.currentQuestionIndex] = "Question skipped - 50% credit given"
-  state.userAnswers[state.currentQuestionIndex] = "[SKIPPED]"
-
-  // Add to strengths since they used strategy
-  state.strengths.add(originalQ.topic)
-  updateLiveStats()
-
-  questionFeedback.innerHTML = "<b>Question Skipped!</b><br>You received 50% credit for strategic skipping."
-  submitTestBtn.style.display = "none"
-
-  showToast("⏭️ Question skipped! Moving to next...")
-
-  setTimeout(() => {
-    state.currentQuestionIndex++
-    const totalQuestions = Number.parseInt(state.settings["num-questions"], 10)
-
-    if (state.currentQuestionIndex < totalQuestions) {
-      if (state.quizData[state.currentQuestionIndex]) {
-        renderQuestion(state.currentQuestionIndex)
-      } else {
-        questionFeedback.innerHTML = "<b>Generating next question...</b>"
-        const waitInterval = setInterval(() => {
-          if (state.quizData[state.currentQuestionIndex]) {
-            clearInterval(waitInterval)
-            renderQuestion(state.currentQuestionIndex)
-          }
-        }, 500)
-      }
-    } else {
-      showResults()
-    }
-  }, 1500)
-}
-
-async function useHint() {
-  const originalQ = state.quizData[state.currentQuestionIndex]
-  const q = state.memeMode ? transformForMemeMode(originalQ) : originalQ
-
-  questionFeedback.innerHTML = "<b>💡 AI is generating your hint...</b>"
-
-  try {
-    const prompt = `Provide a helpful hint for this question without giving away the answer directly:
-    Question: "${originalQ.question}"
-    ${originalQ.type === "mc" ? `Options: ${originalQ.options.join(", ")}` : ""}
-    
-    Give a strategic hint that guides thinking without revealing the answer. Keep it concise and encouraging.
-    Return as JSON: { "hint": "your hint text" }`
-
-    const result = await makeApiCall(prompt)
-    const hintText = result.hint || "Think about the key concepts and eliminate obviously wrong answers first."
-
-    questionFeedback.innerHTML = `<b>💡 Hint:</b> ${hintText}`
-    showToast("💡 Hint revealed!")
-  } catch (error) {
-    console.error("Failed to generate hint:", error)
-    questionFeedback.innerHTML =
-      "<b>💡 Hint:</b> Break down the question into smaller parts and think about what you know about this topic."
-    showToast("💡 Generic hint provided!")
-  }
-}
-
 function awardPowerUp() {
-  // Award power-ups based on performance
+  // Award coins based on performance
   const lastScore = state.scores[state.scores.length - 1] || 0
+  earnCoins(lastScore)
 
-  if (lastScore >= 90) {
-    // Perfect answer - award random power-up
+  // Occasionally award free power-ups for excellent performance
+  if (lastScore >= 95 && Math.random() < 0.2) {
     const powerTypes = Object.keys(POWER_UPS)
     const randomPower = powerTypes[Math.floor(Math.random() * powerTypes.length)]
     state.powerUps[randomPower] = (state.powerUps[randomPower] || 0) + 1
-    showToast(`🎉 Perfect! Earned ${POWER_UPS[randomPower].icon} ${POWER_UPS[randomPower].name}!`)
-    updatePowerUpDisplay()
-  } else if (lastScore >= 75 && Math.random() < 0.3) {
-    // Good answer - 30% chance of power-up
-    const powerTypes = Object.keys(POWER_UPS)
-    const randomPower = powerTypes[Math.floor(Math.random() * powerTypes.length)]
-    state.powerUps[randomPower] = (state.powerUps[randomPower] || 0) + 1
-    showToast(`✨ Good job! Earned ${POWER_UPS[randomPower].icon} ${POWER_UPS[randomPower].name}!`)
+    showToast(`🎉 Perfect! Earned free ${POWER_UPS[randomPower].icon} ${POWER_UPS[randomPower].name}!`)
     updatePowerUpDisplay()
   }
 }
@@ -510,7 +629,16 @@ function renderQuestion(qIndex) {
     wrapper.appendChild(textarea)
   }
   userTestForm.appendChild(wrapper)
-  startTimer(45, () => submitTestBtn.click())
+
+  // Apply time boost if active
+  let startTime = 45
+  if (state.activeEffects.timeBoost) {
+    startTime = 75
+    state.activeEffects.timeBoost = false
+    showToast("⚡ Time boost applied! +30 seconds!")
+  }
+
+  startTimer(startTime, () => submitTestBtn.click())
   updatePowerUpDisplay()
 }
 
@@ -639,15 +767,40 @@ async function handleAnswerSubmit(e) {
   const originalQ = state.quizData[state.currentQuestionIndex]
   const q = state.memeMode ? transformForMemeMode(originalQ) : originalQ
 
-  const userInput =
+  let userInput =
     (userTestForm.querySelector('input[type="radio"]:checked') || userTestForm.querySelector("textarea"))?.value || ""
+
+  // Apply lucky guess effect for MC questions
+  if (state.activeEffects.luckyGuess && q.type === "mc") {
+    userInput = originalQ.answer
+    state.activeEffects.luckyGuess = false
+    showToast("🍀 Lucky guess activated! Auto-corrected your answer!")
+  }
+
   state.userAnswers[state.currentQuestionIndex] = userInput
 
   let result = { score: 0, feedback: "No answer provided." }
 
   if (q.type === "mc") {
-    const isCorrect = userInput.toLowerCase() === q.answer.toLowerCase()
+    const isCorrect = userInput.toLowerCase() === originalQ.answer.toLowerCase()
     result.score = isCorrect ? 100 : 0
+
+    // Apply shield effect
+    if (!isCorrect && state.activeEffects.shield) {
+      result.score = 50 // Minimum score with shield
+      state.activeEffects.shield = false
+      showToast("🛡️ Shield protected you from full point loss!")
+    }
+
+    // Apply second chance effect
+    if (!isCorrect && state.activeEffects.secondChance) {
+      state.activeEffects.secondChance = false
+      questionFeedback.innerHTML = "<b>🔄 Second Chance!</b> Try again - you won't lose points for this attempt."
+      submitTestBtn.style.display = "block"
+      submitTestBtn.textContent = "Try Again"
+      return
+    }
+
     if (state.memeMode) {
       result.feedback = isCorrect ? "W answer, giga-brain 🧠" : "Skill issue 💀"
     } else {
@@ -668,6 +821,14 @@ async function handleAnswerSubmit(e) {
     }
   }
 
+  // Apply double points effect
+  if (state.activeEffects.doublePoints) {
+    result.score *= 2
+    result.score = Math.min(result.score, 100) // Cap at 100%
+    state.activeEffects.doublePoints = false
+    showToast("💎 Double points applied!")
+  }
+
   state.scores[state.currentQuestionIndex] = result.score
   state.feedbacks[state.currentQuestionIndex] = result.feedback
 
@@ -675,6 +836,9 @@ async function handleAnswerSubmit(e) {
   else state.weaknesses.add(originalQ.topic)
   updateLiveStats()
   awardPowerUp()
+
+  // Reset submit button text
+  submitTestBtn.textContent = "Submit Answer"
 
   // Wait for feedback to be shown, then move to next question
   setTimeout(
