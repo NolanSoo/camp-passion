@@ -17,14 +17,14 @@ const STUDY_TIPS = [
   "Fun Fact: The brain is more active during sleep than during the day!",
   "Tip: Connect what you're learning to what you already know.",
   "A good plan violently executed now is better than a perfect plan executed next week. - George S. Patton",
-  "You can’t be everything to everyone. - Sabrina Carpenter",
-  "I’m still learning to love myself. - Sabrina Carpenter",
-  "Don’t let anyone dim your light. - Sabrina Carpenter",
+  "You can't be everything to everyone. - Sabrina Carpenter",
+  "I'm still learning to love myself. - Sabrina Carpenter",
+  "Don't let anyone dim your light. - Sabrina Carpenter",
   "Be proud of who you are. - Olivia Rodrigo",
-  "Sometimes it’s okay not to be okay. - Olivia Rodrigo",
-  "If you’re passionate about something, go for it. - Olivia Rodrigo",
+  "Sometimes it's okay not to be okay. - Olivia Rodrigo",
+  "If you're passionate about something, go for it. - Olivia Rodrigo",
   "You are enough, just as you are. - Billie Eilish",
-  "It’s okay to make mistakes. That’s how you grow. - Billie Eilish",
+  "It's okay to make mistakes. That's how you grow. - Billie Eilish",
   "Happiness is a journey, not a destination. - Billie Eilish",
   "Be fearless in the pursuit of what sets your soul on fire. - Taylor Swift",
   "Just keep dancing through. - Taylor Swift",
@@ -32,30 +32,30 @@ const STUDY_TIPS = [
   "Treat people with kindness. - Harry Styles",
   "A little kindness goes a long way. - Harry Styles",
   "Dream with ambition, lead with conviction. - Beyoncé",
-  "Don’t stop believing in yourself. - Beyoncé",
-  "You’re stronger than you think. - Demi Lovato",
+  "Don't stop believing in yourself. - Beyoncé",
+  "You're stronger than you think. - Demi Lovato",
   "Stay true to yourself. - Demi Lovato",
-  "You can’t control everything, but you can control your attitude. - Ariana Grande",
+  "You can't control everything, but you can control your attitude. - Ariana Grande",
   "Keep your head up. - Ariana Grande",
   "Let your light shine. - Lizzo",
   "Self-love is the best love. - Lizzo",
   "You are your own best friend. - Lizzo",
   "Be the best version of yourself. - Shawn Mendes",
   "Every day is a new beginning. - Shawn Mendes",
-  "Don’t be afraid to stand out. - Camila Cabello",
+  "Don't be afraid to stand out. - Camila Cabello",
   "Believe in your dreams. - Camila Cabello",
   "Sometimes the smallest step in the right direction ends up being the biggest step of your life. - Naeem Callaway (THIS QUOTE IS A BANGER - IF YOU TAKE MANY STEPS, YOU WILL REACH THINGS UNIMAGINABLE TO YOU MAYBE JUST A FEW MONTHS/YEARS AGO :))",
-  "Be the light in someone else’s day. - Forrest Frank",
-  "You’re not alone in this. - Forrest Frank",
+  "Be the light in someone else's day. - Forrest Frank",
+  "You're not alone in this. - Forrest Frank",
   "Take it one day at a time. - Forrest Frank",
-  "You can’t control everything, but you can control your attitude. - Ryan Trahan",
+  "You can't control everything, but you can control your attitude. - Ryan Trahan",
   "Every day is a new adventure. - Ryan Trahan",
-  "Don’t be afraid to try something new. - Ryan Trahan",
+  "Don't be afraid to try something new. - Ryan Trahan",
   "Stay curious and keep learning. - Ryan Trahan",
   "Mistakes are just part of the journey. - Ryan Trahan",
   "Celebrate the little wins. - Ryan Trahan",
-  "Keep showing up, even when it’s hard. - Ryan Trahan",
-  "You don’t have to be perfect to make progress. - Ryan Trahan",
+  "Keep showing up, even when it's hard. - Ryan Trahan",
+  "You don't have to be perfect to make progress. - Ryan Trahan",
   "Be yourself, everyone else is taken. - Ryan Trahan",
   "Dream big, start small. - Ryan Trahan",
   "Your story matters. - Ryan Trahan",
@@ -63,7 +63,7 @@ const STUDY_TIPS = [
   "Tip: Use diagrams and visuals to help remember concepts.",
   "Tip: Practice active recall instead of passive reading.",
   "Tip: Mix up subjects to keep your brain engaged.",
-  "Tip: Don’t be afraid to ask for help.",
+  "Tip: Don't be afraid to ask for help.",
   "Tip: Sleep is essential for memory consolidation.",
   "Tip: Hydrate! Your brain needs water to function well.",
   "Tip: Celebrate small wins to stay motivated.",
@@ -106,6 +106,8 @@ const timerSpan = document.getElementById("timer")
 const questionFeedback = document.getElementById("question-feedback")
 const aiFeedbackCard = document.getElementById("ai-feedback")
 const aiFeedbackContent = document.getElementById("ai-feedback-content")
+const memeSection = document.getElementById("meme-section")
+const memeContent = document.getElementById("meme-content")
 const liveScore = document.getElementById("live-score")
 const scoreFeedback = document.getElementById("score-feedback")
 const recommendationsContent = document.getElementById("recommendations-content")
@@ -118,6 +120,122 @@ let memeToggle // Will be created dynamically
 
 // --- GLOBAL STATE ---
 let state = {}
+
+// --- MEME SEARCH SYSTEM ---
+async function generateMemeSearchQuery(topic, score, isCorrect) {
+  const context = {
+    topic: topic || "studying",
+    performance: score >= 90 ? "excellent" : score >= 70 ? "good" : score >= 50 ? "okay" : "poor",
+    outcome: isCorrect ? "success" : "failure",
+  }
+
+  const prompt = `Generate a 2-5 word meme search query based on this context:
+    Topic: ${context.topic}
+    Performance: ${context.performance} 
+    Outcome: ${context.outcome}
+    
+    The query should be funny, relatable, and suitable for finding memes. Use internet slang and be creative.
+    Examples: "math homework pain", "nailed it boss", "big brain time", "skill issue moment", "victory dance"
+    
+    Return as JSON: { "query": "your 2-5 word search query" }`
+
+  try {
+    const result = await makeApiCall(prompt)
+    return result.query || (isCorrect ? "success moment" : "skill issue")
+  } catch (error) {
+    console.error("Failed to generate meme query:", error)
+    // Fallback queries
+    if (isCorrect) {
+      return ["big brain time", "nailed it", "victory dance", "genius moment"][Math.floor(Math.random() * 4)]
+    } else {
+      return ["skill issue", "pain moment", "struggle bus", "big oof"][Math.floor(Math.random() * 4)]
+    }
+  }
+}
+
+function searchMemes(query, callback) {
+  const memeSearch = window.memeSearch // Declare memeSearch variable
+  if (typeof memeSearch === "undefined") {
+    console.error("Meme search library not loaded")
+    callback(new Error("Meme search not available"), null)
+    return
+  }
+
+  // Try multiple subreddits for better results
+  const subreddits = ["dankmemes", "memes", "me_irl"]
+  const randomSubreddit = subreddits[Math.floor(Math.random() * subreddits.length)]
+
+  memeSearch(
+    query,
+    {
+      subreddit: randomSubreddit,
+      sort: "relevance",
+    },
+    (err, results) => {
+      if (err || !results || results.length === 0) {
+        // Try with a simpler query if first attempt fails
+        const fallbackQueries = ["funny", "meme", "reaction"]
+        const fallbackQuery = fallbackQueries[Math.floor(Math.random() * fallbackQueries.length)]
+
+        memeSearch(
+          fallbackQuery,
+          {
+            subreddit: "memes",
+            sort: "top",
+          },
+          callback,
+        )
+      } else {
+        callback(null, results)
+      }
+    },
+  )
+}
+
+async function displayMeme(topic, score, isCorrect) {
+  if (!state.memeMode) return
+
+  memeSection.style.display = "block"
+  memeContent.innerHTML = "<div class='meme-loading'>🔍 Finding the perfect meme...</div>"
+
+  try {
+    const query = await generateMemeSearchQuery(topic, score, isCorrect)
+    console.log("Searching for memes with query:", query)
+
+    searchMemes(query, (err, memes) => {
+      if (err || !memes || memes.length === 0) {
+        console.error("Meme search failed:", err)
+        memeContent.innerHTML = `
+          <div class="meme-fallback">
+            <div class="meme-emoji">${isCorrect ? "🎉" : "💀"}</div>
+            <div class="meme-text">${isCorrect ? "Big W energy!" : "That's a certified L moment"}</div>
+          </div>
+        `
+        return
+      }
+
+      // Pick a random meme from results
+      const randomMeme = memes[Math.floor(Math.random() * Math.min(memes.length, 5))]
+
+      memeContent.innerHTML = `
+        <div class="meme-container">
+          <img src="${randomMeme.image_url}" alt="${randomMeme.title}" class="meme-image" 
+               onerror="this.parentElement.innerHTML='<div class=\\'meme-error\\'>Meme failed to load 💀</div>'" />
+          <div class="meme-title">${randomMeme.title}</div>
+          <div class="meme-query">Search: "${query}"</div>
+        </div>
+      `
+    })
+  } catch (error) {
+    console.error("Error displaying meme:", error)
+    memeContent.innerHTML = `
+      <div class="meme-fallback">
+        <div class="meme-emoji">🤖</div>
+        <div class="meme-text">Meme machine broke, try again later</div>
+      </div>
+    `
+  }
+}
 
 // --- POWER-UP SYSTEM ---
 const POWER_UPS = {
@@ -592,6 +710,7 @@ function renderQuestion(qIndex) {
   userTestForm.innerHTML = ""
   questionFeedback.innerHTML = ""
   aiFeedbackCard.style.display = "none"
+  memeSection.style.display = "none"
   submitTestBtn.style.display = "block"
   questionNumberSpan.textContent = `${qIndex + 1} / ${state.settings["num-questions"]}`
 
@@ -807,6 +926,11 @@ async function handleAnswerSubmit(e) {
       result.feedback = isCorrect ? "Correct!" : `Incorrect. The right answer is: ${originalQ.answer}`
     }
     questionFeedback.innerHTML = `<b>Feedback:</b> ${result.feedback}<br><em>${originalQ.explanation}</em>`
+
+    // Display meme in meme mode
+    if (state.memeMode) {
+      displayMeme(originalQ.topic, result.score, isCorrect)
+    }
   } else {
     questionFeedback.innerHTML = "<b>AI is evaluating your answer...</b><br><em>Note: This may take a few seconds.</em>"
     try {
@@ -814,6 +938,11 @@ async function handleAnswerSubmit(e) {
       questionFeedback.innerHTML = `<b>Feedback:</b> Evaluation finished.`
       aiFeedbackContent.innerHTML = `<p><strong>Score:</strong> ${result.score}%</p><p>${result.feedback}</p>`
       aiFeedbackCard.style.display = "block"
+
+      // Display meme for short answer questions too
+      if (state.memeMode) {
+        displayMeme(originalQ.topic, result.score, result.score >= 70)
+      }
     } catch (e) {
       console.error("Evaluation error:", e)
       result = { score: 50, feedback: "Could not evaluate automatically. Partial credit given." }
@@ -854,6 +983,7 @@ async function handleAnswerSubmit(e) {
           // Show a mini-loader and wait for it
           questionFeedback.innerHTML = "<b>Generating next question...</b>"
           aiFeedbackCard.style.display = "none"
+          memeSection.style.display = "none"
           const waitInterval = setInterval(() => {
             if (state.quizData[state.currentQuestionIndex]) {
               clearInterval(waitInterval)
@@ -865,7 +995,7 @@ async function handleAnswerSubmit(e) {
         showResults()
       }
     },
-    q.type === "short" ? 3000 : 1500,
+    q.type === "short" ? 4000 : state.memeMode ? 3000 : 1500,
   )
 }
 
@@ -908,8 +1038,8 @@ function init() {
   })
 
   resetState()
-  state.memeMode = false
-  document.body.classList.remove("meme-mode")
+  state.memeMode = false;
+  document.body.classList.remove("meme-mode");
 }
 
 init()
