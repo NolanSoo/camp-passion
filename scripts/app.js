@@ -4,6 +4,8 @@
 const API_KEY = "a29cfe4fa6mshb63da984e4b3f7dp12efdajsneda384ed8b83"
 const API_HOST = "deepseek-v31.p.rapidapi.com"
 const API_URL = "https://deepseek-v31.p.rapidapi.com/"
+const INITIAL_QUESTION_BATCH_SIZE = 3
+const BACKGROUND_QUESTION_BATCH_SIZE = 5
 
 const STUDY_TIPS = [
   "Tip: Enjoy yourself! Learning is meant to be fun - not a chore.",
@@ -130,6 +132,7 @@ function resetState() {
     timerInterval: null,
     timeLeft: 0,
     sessionId: `session_${Date.now()}`,
+    isGenerating: false,
     // memeMode is preserved across resets
     settings: {},
   }
@@ -179,23 +182,35 @@ async function makeApiCall(prompt) {
 
   const result = await response.json()
   if (result.choices && result.choices[0] && result.choices[0].message) {
-    // Clean the response content
     let content = result.choices[0].message.content.trim()
-    if (content.startsWith("```json")) {
-      content = content.substring(7, content.length - 3).trim()
+
+    // Attempt to extract JSON from markdown code block
+    const jsonMatch = content.match(/```json\s*([\s\S]*?)\s*```/)
+    if (jsonMatch && jsonMatch[1]) {
+      content = jsonMatch[1].trim()
+    } else {
+      // If no markdown block, try to clean common conversational intros/outros
+      content = content.replace(/^(Here is the JSON|```json|```|json)\s*/i, "").trim()
+      content = content.replace(/\s*(```|json)$/i, "").trim()
     }
-    return JSON.parse(content)
+
+    try {
+      return JSON.parse(content)
+    } catch (parseError) {
+      console.error("Failed to parse JSON content:", content, parseError)
+      throw new Error(`Invalid JSON received from AI: ${content.substring(0, 100)}...`)
+    }
   }
-  throw new Error("Invalid API response structure")
+  throw new Error("Invalid API response structure: Missing choices or message content.")
 }
 
-async function generateQuiz(settings) {
-  const recentQs = questionTracker.getRecentQuestions(state.sessionId).join(" | ")
+async function generateQuestionBatch(numToGenerate) {
+  const { settings, sessionId } = state
+  const recentQs = questionTracker.getRecentQuestions(sessionId).join(" | ")
   const prompt = `Generate a test with these parameters:
           Topic: ${settings.topic}, Grade: ${settings["grade-level"]}, Subject: ${settings.subject}
           Description: ${settings.description}
-          # of Questions: ${settings["num-questions"]}
-          % Short Answer: ${settings["short-answer"]}
+          # of Questions to generate in this batch: ${numToGenerate}
           Avoid repeating these questions: ${recentQs || "None"}
           Return as a JSON array of questions. Each question must have:
           - type: "mc" or "short"
@@ -205,7 +220,34 @@ async function generateQuiz(settings) {
           - (for short) answer: a detailed model answer string
           - topic: specific sub-topic string
           - explanation: string explaining the correct answer.`
-  return makeApiCall(prompt)
+
+  const newQuestions = await makeApiCall(prompt)
+  if (!Array.isArray(newQuestions)) {
+    throw new Error("AI returned data in an invalid format.")
+  }
+  state.quizData.push(...newQuestions)
+  newQuestions.forEach((q) => questionTracker.addQuestion(sessionId, q.question))
+}
+
+async function generateRemainingQuestionsInBackground() {
+  if (state.isGenerating) return
+  state.isGenerating = true
+
+  let generatedCount = state.quizData.length
+  const totalNeeded = Number.parseInt(state.settings["num-questions"], 10)
+
+  while (generatedCount < totalNeeded) {
+    const numToFetch = Math.min(BACKGROUND_QUESTION_BATCH_SIZE, totalNeeded - generatedCount)
+    try {
+      await generateQuestionBatch(numToFetch)
+      generatedCount = state.quizData.length
+    } catch (error) {
+      console.error("Error generating background questions:", error)
+      // Stop trying if there's an error to avoid infinite loops
+      break
+    }
+  }
+  state.isGenerating = false
 }
 
 async function evaluateShortAnswer(question, userAnswer, modelAnswer) {
@@ -276,7 +318,7 @@ function renderQuestion(qIndex) {
   questionFeedback.innerHTML = ""
   aiFeedbackCard.style.display = "none"
   submitTestBtn.style.display = "block"
-  questionNumberSpan.textContent = `${qIndex + 1} / ${state.quizData.length}`
+  questionNumberSpan.textContent = `${qIndex + 1} / ${state.settings["num-questions"]}`
 
   const wrapper = document.createElement("div")
   wrapper.className = "form-row"
@@ -386,7 +428,6 @@ async function showResults() {
     recommendationsContent.textContent = "Could not generate recommendations at this time."
   }
 
-  // Ensure restart button exists and is correctly wired
   let restartBtn = document.getElementById("restart-btn")
   if (!restartBtn) {
     restartBtn = document.createElement("button")
@@ -410,16 +451,21 @@ async function handleFormSubmit(e) {
   showLoading(true)
   resetState()
   state.settings = Object.fromEntries(new FormData(testForm))
+  const totalQuestions = Number.parseInt(state.settings["num-questions"], 10)
+  const initialFetchCount = Math.min(totalQuestions, INITIAL_QUESTION_BATCH_SIZE)
 
   try {
-    const questions = await generateQuiz(state.settings)
-    if (!questions || !questions.length) throw new Error("Question failed to generate. You can restart the quiz.")
-    state.quizData = questions
-    state.quizData.forEach((q) => questionTracker.addQuestion(state.sessionId, q.question))
+    await generateQuestionBatch(initialFetchCount)
+    if (state.quizData.length === 0) throw new Error("AI failed to generate initial questions.")
 
     inputFormSection.style.display = "none"
     testSection.style.display = "block"
     renderQuestion(state.currentQuestionIndex)
+
+    // Start fetching the rest in the background
+    if (totalQuestions > initialFetchCount) {
+      generateRemainingQuestionsInBackground()
+    }
   } catch (error) {
     console.error("Quiz generation error:", error)
     alert(`Error: ${error.message}. Please try again.`)
@@ -452,7 +498,7 @@ async function handleAnswerSubmit(e) {
     }
     questionFeedback.innerHTML = `<b>Feedback:</b> ${result.feedback}<br><em>${originalQ.explanation}</em>`
   } else {
-    questionFeedback.textContent = "AI is evaluating your answer..."
+    questionFeedback.innerHTML = "<b>AI is evaluating your answer...</b><br><em>Note: This may take a few seconds.</em>"
     try {
       result = await evaluateShortAnswer(q.question, userInput, originalQ.answer)
       questionFeedback.innerHTML = `<b>Feedback:</b> Evaluation finished.`
@@ -468,16 +514,31 @@ async function handleAnswerSubmit(e) {
   state.scores[state.currentQuestionIndex] = result.score
   state.feedbacks[state.currentQuestionIndex] = result.feedback
 
-  // Update strengths/weaknesses
   if (result.score >= 85) state.strengths.add(originalQ.topic)
   else state.weaknesses.add(originalQ.topic)
   updateLiveStats()
 
+  // Wait for feedback to be shown, then move to next question
   setTimeout(
     () => {
       state.currentQuestionIndex++
-      if (state.currentQuestionIndex < state.quizData.length) {
-        renderQuestion(state.currentQuestionIndex)
+      const totalQuestions = Number.parseInt(state.settings["num-questions"], 10)
+
+      if (state.currentQuestionIndex < totalQuestions) {
+        // Check if the next question is ready
+        if (state.quizData[state.currentQuestionIndex]) {
+          renderQuestion(state.currentQuestionIndex)
+        } else {
+          // Show a mini-loader and wait for it
+          questionFeedback.innerHTML = "<b>Generating next question...</b>"
+          aiFeedbackCard.style.display = "none"
+          const waitInterval = setInterval(() => {
+            if (state.quizData[state.currentQuestionIndex]) {
+              clearInterval(waitInterval)
+              renderQuestion(state.currentQuestionIndex)
+            }
+          }, 500) // Check every half a second
+        }
       } else {
         showResults()
       }
@@ -499,7 +560,6 @@ function handleMemeToggle() {
 
 // --- INITIALIZATION ---
 function init() {
-  // Create and add meme toggle button
   const themeRow = document.querySelector(".theme-toggle-row")
   if (themeRow) {
     memeToggle = document.createElement("button")
@@ -516,7 +576,6 @@ function init() {
   themeToggle.addEventListener("click", handleThemeToggle)
 
   resetState()
-  // Set initial meme mode state to false
   state.memeMode = false
   document.body.classList.remove("meme-mode")
 }
