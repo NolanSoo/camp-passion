@@ -119,6 +119,161 @@ let memeToggle // Will be created dynamically
 // --- GLOBAL STATE ---
 let state = {}
 
+// --- POWER-UP SYSTEM ---
+const POWER_UPS = {
+  "extra-time": { name: "Extra Time", icon: "⏰", cost: 0, description: "Add 15 seconds to current question" },
+  skip: { name: "Skip Question", icon: "⏭️", cost: 0, description: "Skip current question (50% credit)" },
+  hint: { name: "Get Hint", icon: "💡", cost: 0, description: "Get an AI-generated hint" },
+}
+
+function initializePowerUps() {
+  state.powerUps = {
+    "extra-time": 1, // Start with 1 of each
+    skip: 1,
+    hint: 1,
+  }
+  updatePowerUpDisplay()
+}
+
+function updatePowerUpDisplay() {
+  const powerUpsSection = document.getElementById("power-ups-section")
+  if (!powerUpsSection) return
+
+  powerUpsSection.style.display = "block"
+  const buttons = powerUpsSection.querySelectorAll(".power-up-btn")
+
+  buttons.forEach((btn) => {
+    const powerType = btn.dataset.power
+    const available = state.powerUps[powerType] || 0
+
+    btn.disabled = available <= 0
+    btn.classList.toggle("available", available > 0)
+    btn.classList.toggle("disabled", available <= 0)
+
+    // Update button text to show count
+    const powerUp = POWER_UPS[powerType]
+    btn.innerHTML = `${powerUp.icon} ${powerUp.name} (${available})`
+  })
+}
+
+function usePowerUp(powerType) {
+  if (!state.powerUps[powerType] || state.powerUps[powerType] <= 0) {
+    showToast("No power-ups of this type available!")
+    return false
+  }
+
+  state.powerUps[powerType]--
+  updatePowerUpDisplay()
+
+  switch (powerType) {
+    case "extra-time":
+      useExtraTime()
+      break
+    case "skip":
+      skipQuestion()
+      break
+    case "hint":
+      useHint()
+      break
+  }
+
+  return true
+}
+
+function useExtraTime() {
+  state.timeLeft += 15
+  updateTimerDisplay()
+  showToast("⏰ +15 seconds added!")
+}
+
+function skipQuestion() {
+  clearInterval(state.timerInterval)
+
+  // Give 50% credit for skipping
+  const originalQ = state.quizData[state.currentQuestionIndex]
+  state.scores[state.currentQuestionIndex] = 50
+  state.feedbacks[state.currentQuestionIndex] = "Question skipped - 50% credit given"
+  state.userAnswers[state.currentQuestionIndex] = "[SKIPPED]"
+
+  // Add to strengths since they used strategy
+  state.strengths.add(originalQ.topic)
+  updateLiveStats()
+
+  questionFeedback.innerHTML = "<b>Question Skipped!</b><br>You received 50% credit for strategic skipping."
+  submitTestBtn.style.display = "none"
+
+  showToast("⏭️ Question skipped! Moving to next...")
+
+  setTimeout(() => {
+    state.currentQuestionIndex++
+    const totalQuestions = Number.parseInt(state.settings["num-questions"], 10)
+
+    if (state.currentQuestionIndex < totalQuestions) {
+      if (state.quizData[state.currentQuestionIndex]) {
+        renderQuestion(state.currentQuestionIndex)
+      } else {
+        questionFeedback.innerHTML = "<b>Generating next question...</b>"
+        const waitInterval = setInterval(() => {
+          if (state.quizData[state.currentQuestionIndex]) {
+            clearInterval(waitInterval)
+            renderQuestion(state.currentQuestionIndex)
+          }
+        }, 500)
+      }
+    } else {
+      showResults()
+    }
+  }, 1500)
+}
+
+async function useHint() {
+  const originalQ = state.quizData[state.currentQuestionIndex]
+  const q = state.memeMode ? transformForMemeMode(originalQ) : originalQ
+
+  questionFeedback.innerHTML = "<b>💡 AI is generating your hint...</b>"
+
+  try {
+    const prompt = `Provide a helpful hint for this question without giving away the answer directly:
+    Question: "${originalQ.question}"
+    ${originalQ.type === "mc" ? `Options: ${originalQ.options.join(", ")}` : ""}
+    
+    Give a strategic hint that guides thinking without revealing the answer. Keep it concise and encouraging.
+    Return as JSON: { "hint": "your hint text" }`
+
+    const result = await makeApiCall(prompt)
+    const hintText = result.hint || "Think about the key concepts and eliminate obviously wrong answers first."
+
+    questionFeedback.innerHTML = `<b>💡 Hint:</b> ${hintText}`
+    showToast("💡 Hint revealed!")
+  } catch (error) {
+    console.error("Failed to generate hint:", error)
+    questionFeedback.innerHTML =
+      "<b>💡 Hint:</b> Break down the question into smaller parts and think about what you know about this topic."
+    showToast("💡 Generic hint provided!")
+  }
+}
+
+function awardPowerUp() {
+  // Award power-ups based on performance
+  const lastScore = state.scores[state.scores.length - 1] || 0
+
+  if (lastScore >= 90) {
+    // Perfect answer - award random power-up
+    const powerTypes = Object.keys(POWER_UPS)
+    const randomPower = powerTypes[Math.floor(Math.random() * powerTypes.length)]
+    state.powerUps[randomPower] = (state.powerUps[randomPower] || 0) + 1
+    showToast(`🎉 Perfect! Earned ${POWER_UPS[randomPower].icon} ${POWER_UPS[randomPower].name}!`)
+    updatePowerUpDisplay()
+  } else if (lastScore >= 75 && Math.random() < 0.3) {
+    // Good answer - 30% chance of power-up
+    const powerTypes = Object.keys(POWER_UPS)
+    const randomPower = powerTypes[Math.floor(Math.random() * powerTypes.length)]
+    state.powerUps[randomPower] = (state.powerUps[randomPower] || 0) + 1
+    showToast(`✨ Good job! Earned ${POWER_UPS[randomPower].icon} ${POWER_UPS[randomPower].name}!`)
+    updatePowerUpDisplay()
+  }
+}
+
 function resetState() {
   state = {
     quizData: [],
@@ -136,6 +291,7 @@ function resetState() {
     // memeMode is preserved across resets
     settings: {},
   }
+  initializePowerUps()
   questionTracker.clearSession(state.sessionId)
 }
 
@@ -355,6 +511,7 @@ function renderQuestion(qIndex) {
   }
   userTestForm.appendChild(wrapper)
   startTimer(45, () => submitTestBtn.click())
+  updatePowerUpDisplay()
 }
 
 function startTimer(seconds, onTimeout) {
@@ -517,6 +674,7 @@ async function handleAnswerSubmit(e) {
   if (result.score >= 85) state.strengths.add(originalQ.topic)
   else state.weaknesses.add(originalQ.topic)
   updateLiveStats()
+  awardPowerUp()
 
   // Wait for feedback to be shown, then move to next question
   setTimeout(
@@ -574,6 +732,16 @@ function init() {
   testForm.addEventListener("submit", handleFormSubmit)
   submitTestBtn.addEventListener("click", handleAnswerSubmit)
   themeToggle.addEventListener("click", handleThemeToggle)
+
+  // Power-up event listeners
+  document.addEventListener("click", (e) => {
+    if (e.target.classList.contains("power-up-btn")) {
+      const powerType = e.target.dataset.power
+      if (powerType && !e.target.disabled) {
+        usePowerUp(powerType)
+      }
+    }
+  })
 
   resetState()
   state.memeMode = false
