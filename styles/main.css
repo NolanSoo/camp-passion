@@ -1337,8 +1337,8 @@ body.light-theme .achievements-section {
 }
 
 body.light-theme .achievement-badge {
-  background: linear-gradient(135deg, #ffd700, #ffb347);
-  color: #2c3e50;
+  background: linear-gradient(105deg, #ffd700, #ffb347);
+  color: #384c61;
 }
 
 /* Meme mode achievements */
