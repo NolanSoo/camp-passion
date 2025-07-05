@@ -121,6 +121,174 @@ let memeToggle // Will be created dynamically
 // --- GLOBAL STATE ---
 let state = {}
 
+// --- ACHIEVEMENT SYSTEM ---
+const ACHIEVEMENTS = {
+  "first-quiz": {
+    name: "Getting Started",
+    icon: "🎯",
+    description: "Complete your first quiz",
+    condition: (stats) => stats.quizzesCompleted >= 1,
+  },
+  "perfect-score": {
+    name: "Perfectionist",
+    icon: "💯",
+    description: "Score 100% on a quiz",
+    condition: (stats) => stats.perfectScores >= 1,
+  },
+  "speed-demon": {
+    name: "Speed Demon",
+    icon: "⚡",
+    description: "Answer 3 questions in under 10 seconds each",
+    condition: (stats) => stats.fastAnswers >= 3,
+  },
+  "coin-collector": {
+    name: "Coin Collector",
+    icon: "💰",
+    description: "Earn 50 coins total",
+    condition: (stats) => stats.totalCoinsEarned >= 50,
+  },
+  "power-user": {
+    name: "Power User",
+    icon: "🔋",
+    description: "Use 10 power-ups",
+    condition: (stats) => stats.powerUpsUsed >= 10,
+  },
+  "meme-lord": {
+    name: "Meme Lord",
+    icon: "😂",
+    description: "Complete 5 quizzes in meme mode",
+    condition: (stats) => stats.memeQuizzes >= 5,
+  },
+  "streak-master": {
+    name: "Streak Master",
+    icon: "🔥",
+    description: "Get 5 correct answers in a row",
+    condition: (stats) => stats.maxStreak >= 5,
+  },
+  scholar: {
+    name: "Scholar",
+    icon: "🎓",
+    description: "Complete 10 quizzes",
+    condition: (stats) => stats.quizzesCompleted >= 10,
+  },
+  "big-brain": {
+    name: "Big Brain",
+    icon: "🧠",
+    description: "Score 90%+ on 5 quizzes",
+    condition: (stats) => stats.highScores >= 5,
+  },
+  "time-master": {
+    name: "Time Master",
+    icon: "⏰",
+    description: "Complete a quiz without running out of time",
+    condition: (stats) => stats.noTimeouts >= 1,
+  },
+}
+
+function initializeAchievements() {
+  if (!state.achievements) {
+    state.achievements = {
+      unlocked: new Set(),
+      stats: {
+        quizzesCompleted: 0,
+        perfectScores: 0,
+        fastAnswers: 0,
+        totalCoinsEarned: 0,
+        powerUpsUsed: 0,
+        memeQuizzes: 0,
+        maxStreak: 0,
+        currentStreak: 0,
+        highScores: 0,
+        noTimeouts: 0,
+      },
+    }
+  }
+}
+
+function checkAchievements() {
+  const { stats, unlocked } = state.achievements
+  const newAchievements = []
+
+  Object.entries(ACHIEVEMENTS).forEach(([key, achievement]) => {
+    if (!unlocked.has(key) && achievement.condition(stats)) {
+      unlocked.add(key)
+      newAchievements.push(achievement)
+    }
+  })
+
+  if (newAchievements.length > 0) {
+    showAchievementNotification(newAchievements)
+  }
+}
+
+function showAchievementNotification(achievements) {
+  achievements.forEach((achievement, index) => {
+    setTimeout(() => {
+      const notification = document.createElement("div")
+      notification.className = "achievement-notification"
+      notification.innerHTML = `
+        <div class="achievement-content">
+          <div class="achievement-icon">${achievement.icon}</div>
+          <div class="achievement-text">
+            <div class="achievement-title">Achievement Unlocked!</div>
+            <div class="achievement-name">${achievement.name}</div>
+            <div class="achievement-desc">${achievement.description}</div>
+          </div>
+        </div>
+      `
+      document.body.appendChild(notification)
+
+      // Animate in
+      setTimeout(() => notification.classList.add("show"), 100)
+
+      // Remove after 4 seconds
+      setTimeout(() => {
+        notification.classList.remove("show")
+        setTimeout(() => notification.remove(), 300)
+      }, 4000)
+    }, index * 1000) // Stagger multiple achievements
+  })
+}
+
+function updateAchievementStats(statType, value = 1) {
+  if (!state.achievements) initializeAchievements()
+
+  if (statType === "streak") {
+    state.achievements.stats.currentStreak = value
+    state.achievements.stats.maxStreak = Math.max(state.achievements.stats.maxStreak, value)
+  } else {
+    state.achievements.stats[statType] += value
+  }
+
+  checkAchievements()
+}
+
+function displayAchievements() {
+  if (!state.achievements) return ""
+
+  const unlockedAchievements = Array.from(state.achievements.unlocked)
+  if (unlockedAchievements.length === 0) return ""
+
+  return `
+    <div class="achievements-section">
+      <h4>🏆 Achievements (${unlockedAchievements.length}/${Object.keys(ACHIEVEMENTS).length})</h4>
+      <div class="achievements-grid">
+        ${unlockedAchievements
+          .map((key) => {
+            const achievement = ACHIEVEMENTS[key]
+            return `
+            <div class="achievement-badge">
+              <span class="achievement-icon">${achievement.icon}</span>
+              <span class="achievement-name">${achievement.name}</span>
+            </div>
+          `
+          })
+          .join("")}
+      </div>
+    </div>
+  `
+}
+
 // --- MEME SEARCH SYSTEM ---
 async function generateMemeSearchQuery(topic, score, isCorrect) {
   const context = {
@@ -239,23 +407,23 @@ async function displayMeme(topic, score, isCorrect) {
 
 // --- POWER-UP SYSTEM ---
 const POWER_UPS = {
-  "extra-time": { name: "Extra Time", icon: "⏰", cost: 2, description: "Add 15 seconds to current question" },
-  skip: { name: "Skip Question", icon: "⏭️", cost: 3, description: "Skip current question (50% credit)" },
-  hint: { name: "Get Hint", icon: "💡", cost: 1, description: "Get an AI-generated hint" },
-  "double-points": { name: "Double Points", icon: "💎", cost: 4, description: "Next question worth 2x points" },
-  "freeze-timer": { name: "Freeze Timer", icon: "❄️", cost: 3, description: "Pause timer for 10 seconds" },
-  "fifty-fifty": { name: "50/50", icon: "🎯", cost: 2, description: "Eliminate 2 wrong answers (MC only)" },
-  "second-chance": { name: "Second Chance", icon: "🔄", cost: 5, description: "Retry question if wrong" },
-  "lucky-guess": { name: "Lucky Guess", icon: "🍀", cost: 6, description: "Auto-correct next MC question" },
-  "time-boost": { name: "Time Boost", icon: "⚡", cost: 3, description: "Start next question with +30 seconds" },
-  shield: { name: "Shield", icon: "🛡️", cost: 4, description: "Protect from point loss on next wrong answer" },
+  "extra-time": { name: "Extra Time", icon: "⏰", cost: 4, description: "Add 15 seconds to current question" },
+  skip: { name: "Skip Question", icon: "⏭️", cost: 6, description: "Skip current question (50% credit)" },
+  hint: { name: "Get Hint", icon: "💡", cost: 5, description: "Get an AI-generated hint" },
+  "double-points": { name: "Double Points", icon: "💎", cost: 8, description: "Next question worth 2x points" },
+  "freeze-timer": { name: "Freeze Timer", icon: "❄️", cost: 6, description: "Pause timer for 10 seconds" },
+  "fifty-fifty": { name: "50/50", icon: "🎯", cost: 4, description: "Eliminate 2 wrong answers (MC only)" },
+  "second-chance": { name: "Second Chance", icon: "🔄", cost: 10, description: "Retry question if wrong" },
+  "lucky-guess": { name: "Lucky Guess", icon: "🍀", cost: 12, description: "Auto-correct next MC question" },
+  "time-boost": { name: "Time Boost", icon: "⚡", cost: 5, description: "Start next question with +30 seconds" },
+  shield: { name: "Shield", icon: "🛡️", cost: 7, description: "Protect from point loss on next wrong answer" },
 }
 
 function initializePowerUps() {
   state.powerUps = {
     "extra-time": 0,
     skip: 0,
-    hint: 1, // Start with 1 free hint
+    hint: 0, // No free hints anymore
     "double-points": 0,
     "freeze-timer": 0,
     "fifty-fifty": 0,
@@ -264,7 +432,7 @@ function initializePowerUps() {
     "time-boost": 0,
     shield: 0,
   }
-  state.coins = 5 // Start with 5 coins
+  state.coins = 10 // Start with more coins since powerups are more expensive
   state.activeEffects = {
     doublePoints: false,
     timeBoost: false,
@@ -287,15 +455,16 @@ function updateCoinsDisplay() {
       powerUpsSection.insertBefore(coinsDisplay, powerUpsSection.firstChild)
     }
   }
-  coinsDisplay.innerHTML = `<span class="coins-icon">🪙</span> <strong>${state.coins || 0}</strong> coins`
+  coinsDisplay.innerHTML = `<span class="coins-icon">🟡</span> <strong>${state.coins || 0}</strong> coins`
 }
 
 function earnCoins(score) {
   const coinsEarned = Math.round(score) / 100 // 100% = 1 coin, 50% = 0.5 coins, etc.
   state.coins = (state.coins || 0) + coinsEarned
   updateCoinsDisplay()
+  updateAchievementStats("totalCoinsEarned", coinsEarned)
   if (coinsEarned > 0) {
-    showToast(`🪙 Earned ${coinsEarned} coins!`)
+    showToast(`🟡 Earned ${coinsEarned} coins!`)
   }
 }
 
@@ -430,7 +599,7 @@ function updatePowerUpDisplay() {
     if (available > 0) {
       btn.innerHTML = `${powerUp.icon} ${powerUp.name} (${available})`
     } else {
-      btn.innerHTML = `${powerUp.icon} ${powerUp.name} (${powerUp.cost}🪙)`
+      btn.innerHTML = `${powerUp.icon} ${powerUp.name} (${powerUp.cost}🟡)`
     }
   })
 
@@ -451,6 +620,7 @@ function usePowerUp(powerType) {
   }
 
   updatePowerUpDisplay()
+  updateAchievementStats("powerUpsUsed")
 
   switch (powerType) {
     case "extra-time":
@@ -502,12 +672,20 @@ function awardPowerUp() {
   earnCoins(lastScore)
 
   // Occasionally award free power-ups for excellent performance
-  if (lastScore >= 95 && Math.random() < 0.2) {
+  if (lastScore >= 95 && Math.random() < 0.15) {
+    // Reduced chance since powerups are more expensive
     const powerTypes = Object.keys(POWER_UPS)
     const randomPower = powerTypes[Math.floor(Math.random() * powerTypes.length)]
     state.powerUps[randomPower] = (state.powerUps[randomPower] || 0) + 1
     showToast(`🎉 Perfect! Earned free ${POWER_UPS[randomPower].icon} ${POWER_UPS[randomPower].name}!`)
     updatePowerUpDisplay()
+  }
+
+  // Safety check - if we've answered all questions, show results
+  const totalQuestions = Number.parseInt(state.settings["num-questions"], 10)
+  if (state.scores.length >= totalQuestions && state.currentQuestionIndex >= totalQuestions) {
+    console.log("Safety check triggered - showing results")
+    setTimeout(() => showResults(), 1000)
   }
 }
 
@@ -525,10 +703,12 @@ function resetState() {
     timeLeft: 0,
     sessionId: `session_${Date.now()}`,
     isGenerating: false,
-    // memeMode is preserved across resets
+    questionStartTime: null,
+    // memeMode and achievements are preserved across resets
     settings: {},
   }
   initializePowerUps()
+  initializeAchievements()
   questionTracker.clearSession(state.sessionId)
 }
 
@@ -757,6 +937,7 @@ function renderQuestion(qIndex) {
     showToast("⚡ Time boost applied! +30 seconds!")
   }
 
+  state.questionStartTime = Date.now()
   startTimer(startTime, () => submitTestBtn.click())
   updatePowerUpDisplay()
 }
@@ -799,6 +980,28 @@ function updateLiveStats() {
 }
 
 async function showResults() {
+  // Safety check - make sure we have completed all questions
+  const totalQuestions = Number.parseInt(state.settings["num-questions"], 10)
+  if (state.currentQuestionIndex < totalQuestions && state.scores.length < totalQuestions) {
+    console.warn("Results called prematurely, waiting for completion")
+    return
+  }
+
+  // Update achievement stats
+  updateAchievementStats("quizzesCompleted")
+  if (state.totalScore === 100) updateAchievementStats("perfectScores")
+  if (state.totalScore >= 90) updateAchievementStats("highScores")
+  if (state.memeMode) updateAchievementStats("memeQuizzes")
+
+  // Check if completed without timeouts
+  let noTimeouts = true
+  state.scores.forEach((score, index) => {
+    if (state.userAnswers[index] === "" || state.userAnswers[index] === undefined) {
+      noTimeouts = false
+    }
+  })
+  if (noTimeouts) updateAchievementStats("noTimeouts")
+
   testSection.style.display = "none"
   resultsSection.style.display = "block"
   const grade =
@@ -821,7 +1024,7 @@ async function showResults() {
         ? `👑 Giga-chad performance! You got ${state.totalScore}%`
         : `💀 Skill issue... you got ${state.totalScore}%. Try again maybe?`
   }
-  scoreFeedback.innerHTML = scoreText
+  scoreFeedback.innerHTML = scoreText + displayAchievements()
 
   recommendationsContent.innerHTML = "Generating recommendations..."
   try {
@@ -883,6 +1086,11 @@ async function handleAnswerSubmit(e) {
   clearInterval(state.timerInterval)
   submitTestBtn.style.display = "none"
 
+  // Check for fast answer achievement
+  if (state.questionStartTime && Date.now() - state.questionStartTime < 10000) {
+    updateAchievementStats("fastAnswers")
+  }
+
   const originalQ = state.quizData[state.currentQuestionIndex]
   const q = state.memeMode ? transformForMemeMode(originalQ) : originalQ
 
@@ -903,6 +1111,14 @@ async function handleAnswerSubmit(e) {
   if (q.type === "mc") {
     const isCorrect = userInput.toLowerCase() === originalQ.answer.toLowerCase()
     result.score = isCorrect ? 100 : 0
+
+    // Update streak
+    if (isCorrect) {
+      const newStreak = (state.achievements?.stats.currentStreak || 0) + 1
+      updateAchievementStats("streak", newStreak)
+    } else {
+      updateAchievementStats("streak", 0)
+    }
 
     // Apply shield effect
     if (!isCorrect && state.activeEffects.shield) {
@@ -938,6 +1154,14 @@ async function handleAnswerSubmit(e) {
       questionFeedback.innerHTML = `<b>Feedback:</b> Evaluation finished.`
       aiFeedbackContent.innerHTML = `<p><strong>Score:</strong> ${result.score}%</p><p>${result.feedback}</p>`
       aiFeedbackCard.style.display = "block"
+
+      // Update streak for short answers
+      if (result.score >= 70) {
+        const newStreak = (state.achievements?.stats.currentStreak || 0) + 1
+        updateAchievementStats("streak", newStreak)
+      } else {
+        updateAchievementStats("streak", 0)
+      }
 
       // Display meme for short answer questions too
       if (state.memeMode) {
@@ -984,14 +1208,27 @@ async function handleAnswerSubmit(e) {
           questionFeedback.innerHTML = "<b>Generating next question...</b>"
           aiFeedbackCard.style.display = "none"
           memeSection.style.display = "none"
+
+          let waitAttempts = 0
+          const maxWaitAttempts = 20 // 10 seconds max wait
+
           const waitInterval = setInterval(() => {
+            waitAttempts++
+
             if (state.quizData[state.currentQuestionIndex]) {
               clearInterval(waitInterval)
               renderQuestion(state.currentQuestionIndex)
+            } else if (waitAttempts >= maxWaitAttempts) {
+              // Timeout - force finish the quiz
+              clearInterval(waitInterval)
+              console.warn("Timeout waiting for next question, finishing quiz")
+              showResults()
             }
           }, 500) // Check every half a second
         }
       } else {
+        // All questions completed
+        console.log("All questions completed, showing results")
         showResults()
       }
     },
@@ -1038,8 +1275,8 @@ function init() {
   })
 
   resetState()
-  state.memeMode = false;
-  document.body.classList.remove("meme-mode");
+  state.memeMode = false
+  document.body.classList.remove("meme-mode")
 }
-
+// Initialize the app :D
 init()
