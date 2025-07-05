@@ -844,6 +844,34 @@ async function getStudyRecommendations() {
   return result.recommendations
 }
 
+// --- CONFETTI CELEBRATION ---
+function createConfetti() {
+  const colors = ["#ff6b6b", "#4ecdc4", "#45b7d1", "#96c93d", "#ffd700", "#ff8a80", "#82b1ff"]
+  const confettiCount = 50
+
+  for (let i = 0; i < confettiCount; i++) {
+    const confetti = document.createElement("div")
+    confetti.className = "confetti-piece"
+    confetti.style.cssText = `
+      position: fixed;
+      width: 10px;
+      height: 10px;
+      background: ${colors[Math.floor(Math.random() * colors.length)]};
+      left: ${Math.random() * 100}vw;
+      top: -10px;
+      z-index: 1000;
+      pointer-events: none;
+      border-radius: ${Math.random() > 0.5 ? "50%" : "0"};
+      animation: confettiFall ${2 + Math.random() * 3}s linear forwards;
+      transform: rotate(${Math.random() * 360}deg);
+    `
+    document.body.appendChild(confetti)
+
+    // Remove after animation
+    setTimeout(() => confetti.remove(), 5000)
+  }
+}
+
 // --- UI & QUIZ FLOW ---
 function showToast(message) {
   const toast = document.createElement("div")
@@ -1026,6 +1054,14 @@ async function showResults() {
   }
   scoreFeedback.innerHTML = scoreText + displayAchievements()
 
+  // 🎉 CONFETTI FOR HIGH SCORES!
+  if (state.totalScore >= 90) {
+    setTimeout(() => createConfetti(), 1000)
+    if (state.totalScore === 100) {
+      setTimeout(() => createConfetti(), 2000) // Double confetti for perfect!
+    }
+  }
+
   recommendationsContent.innerHTML = "Generating recommendations..."
   try {
     const recommendations = await getStudyRecommendations()
@@ -1111,6 +1147,12 @@ async function handleAnswerSubmit(e) {
   if (q.type === "mc") {
     const isCorrect = userInput.toLowerCase() === originalQ.answer.toLowerCase()
     result.score = isCorrect ? 100 : 0
+
+    // 🎉 CONFETTI FOR PERFECT ANSWERS!
+    if (isCorrect && Math.random() < 0.3) {
+      // 30% chance for variety
+      setTimeout(() => createConfetti(), 500)
+    }
 
     // Update streak
     if (isCorrect) {
@@ -1278,5 +1320,5 @@ function init() {
   state.memeMode = false
   document.body.classList.remove("meme-mode")
 }
-// Initialize the app :D
+
 init()
