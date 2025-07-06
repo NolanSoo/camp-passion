@@ -290,120 +290,121 @@ function displayAchievements() {
 }
 
 // --- MEME SEARCH SYSTEM ---
-async function generateMemeSearchQuery(topic, score, isCorrect) {
-  const context = {
-    topic: topic || "studying",
-    performance: score >= 90 ? "excellent" : score >= 70 ? "good" : score >= 50 ? "okay" : "poor",
-    outcome: isCorrect ? "success" : "failure",
-  }
+// --- MEME SEARCH SYSTEM ---
+// async function generateMemeSearchQuery(topic, score, isCorrect) {
+//   const context = {
+//     topic: topic || "studying",
+//     performance: score >= 90 ? "excellent" : score >= 70 ? "good" : score >= 50 ? "okay" : "poor",
+//     outcome: isCorrect ? "success" : "failure",
+//   }
 
-  const prompt = `Generate a 2-5 word meme search query based on this context:
-    Topic: ${context.topic}
-    Performance: ${context.performance} 
-    Outcome: ${context.outcome}
-    
-    The query should be funny, relatable, and suitable for finding memes. Use internet slang and be creative.
-    Examples: "math homework pain", "nailed it boss", "big brain time", "skill issue moment", "victory dance"
-    
-    Return as JSON: { "query": "your 2-5 word search query" }`
+//   const prompt = `Generate a 2-5 word meme search query based on this context:
+//     Topic: ${context.topic}
+//     Performance: ${context.performance}
+//     Outcome: ${context.outcome}
 
-  try {
-    const result = await makeApiCall(prompt)
-    return result.query || (isCorrect ? "success moment" : "skill issue")
-  } catch (error) {
-    console.error("Failed to generate meme query:", error)
-    // Fallback queries
-    if (isCorrect) {
-      return ["big brain time", "nailed it", "victory dance", "genius moment"][Math.floor(Math.random() * 4)]
-    } else {
-      return ["skill issue", "pain moment", "struggle bus", "big oof"][Math.floor(Math.random() * 4)]
-    }
-  }
-}
+//     The query should be funny, relatable, and suitable for finding memes. Use internet slang and be creative.
+//     Examples: "math homework pain", "nailed it boss", "big brain time", "skill issue moment", "victory dance"
 
-function searchMemes(query, callback) {
-  const memeSearch = window.memeSearch // Declare memeSearch variable
-  if (typeof memeSearch === "undefined") {
-    console.error("Meme search library not loaded")
-    callback(new Error("Meme search not available"), null)
-    return
-  }
+//     Return as JSON: { "query": "your 2-5 word search query" }`
 
-  // Try multiple subreddits for better results
-  const subreddits = ["dankmemes", "memes", "me_irl"]
-  const randomSubreddit = subreddits[Math.floor(Math.random() * subreddits.length)]
+//   try {
+//     const result = await makeApiCall(prompt)
+//     return result.query || (isCorrect ? "success moment" : "skill issue")
+//   } catch (error) {
+//     console.error("Failed to generate meme query:", error)
+//     // Fallback queries
+//     if (isCorrect) {
+//       return ["big brain time", "nailed it", "victory dance", "genius moment"][Math.floor(Math.random() * 4)]
+//     } else {
+//       return ["skill issue", "pain moment", "struggle bus", "big oof"][Math.floor(Math.random() * 4)]
+//     }
+//   }
+// }
 
-  memeSearch(
-    query,
-    {
-      subreddit: randomSubreddit,
-      sort: "relevance",
-    },
-    (err, results) => {
-      if (err || !results || results.length === 0) {
-        // Try with a simpler query if first attempt fails
-        const fallbackQueries = ["funny", "meme", "reaction"]
-        const fallbackQuery = fallbackQueries[Math.floor(Math.random() * fallbackQueries.length)]
+// function searchMemes(query, callback) {
+//   const memeSearch = window.memeSearch // Declare memeSearch variable
+//   if (typeof memeSearch === "undefined") {
+//     console.error("Meme search library not loaded")
+//     callback(new Error("Meme search not available"), null)
+//     return
+//   }
 
-        memeSearch(
-          fallbackQuery,
-          {
-            subreddit: "memes",
-            sort: "top",
-          },
-          callback,
-        )
-      } else {
-        callback(null, results)
-      }
-    },
-  )
-}
+//   // Try multiple subreddits for better results
+//   const subreddits = ["dankmemes", "memes", "me_irl"]
+//   const randomSubreddit = subreddits[Math.floor(Math.random() * subreddits.length)]
 
-async function displayMeme(topic, score, isCorrect) {
-  if (!state.memeMode) return
+//   memeSearch(
+//     query,
+//     {
+//       subreddit: randomSubreddit,
+//       sort: "relevance",
+//     },
+//     (err, results) => {
+//       if (err || !results || results.length === 0) {
+//         // Try with a simpler query if first attempt fails
+//         const fallbackQueries = ["funny", "meme", "reaction"]
+//         const fallbackQuery = fallbackQueries[Math.floor(Math.random() * fallbackQueries.length)]
 
-  memeSection.style.display = "block"
-  memeContent.innerHTML = "<div class='meme-loading'>🔍 Finding the perfect meme...</div>"
+//         memeSearch(
+//           fallbackQuery,
+//           {
+//             subreddit: "memes",
+//             sort: "top",
+//           },
+//           callback,
+//         )
+//       } else {
+//         callback(null, results)
+//       }
+//     },
+//   )
+// }
 
-  try {
-    const query = await generateMemeSearchQuery(topic, score, isCorrect)
-    console.log("Searching for memes with query:", query)
+// async function displayMeme(topic, score, isCorrect) {
+//   if (!state.memeMode) return
 
-    searchMemes(query, (err, memes) => {
-      if (err || !memes || memes.length === 0) {
-        console.error("Meme search failed:", err)
-        memeContent.innerHTML = `
-          <div class="meme-fallback">
-            <div class="meme-emoji">${isCorrect ? "🎉" : "💀"}</div>
-            <div class="meme-text">${isCorrect ? "Big W energy!" : "That's a certified L moment"}</div>
-          </div>
-        `
-        return
-      }
+//   memeSection.style.display = "block"
+//   memeContent.innerHTML = "<div class='meme-loading'>🔍 Finding the perfect meme...</div>"
 
-      // Pick a random meme from results
-      const randomMeme = memes[Math.floor(Math.random() * Math.min(memes.length, 5))]
+//   try {
+//     const query = await generateMemeSearchQuery(topic, score, isCorrect)
+//     console.log("Searching for memes with query:", query)
 
-      memeContent.innerHTML = `
-        <div class="meme-container">
-          <img src="${randomMeme.image_url}" alt="${randomMeme.title}" class="meme-image" 
-               onerror="this.parentElement.innerHTML='<div class=\\'meme-error\\'>Meme failed to load 💀</div>'" />
-          <div class="meme-title">${randomMeme.title}</div>
-          <div class="meme-query">Search: "${query}"</div>
-        </div>
-      `
-    })
-  } catch (error) {
-    console.error("Error displaying meme:", error)
-    memeContent.innerHTML = `
-      <div class="meme-fallback">
-        <div class="meme-emoji">🤖</div>
-        <div class="meme-text">Meme machine broke, try again later</div>
-      </div>
-    `
-  }
-}
+//     searchMemes(query, (err, memes) => {
+//       if (err || !memes || memes.length === 0) {
+//         console.error("Meme search failed:", err)
+//         memeContent.innerHTML = `
+//           <div class="meme-fallback">
+//             <div class="meme-emoji">${isCorrect ? "🎉" : "💀"}</div>
+//             <div class="meme-text">${isCorrect ? "Big W energy!" : "That's a certified L moment"}</div>
+//           </div>
+//         `
+//         return
+//       }
+
+//       // Pick a random meme from results
+//       const randomMeme = memes[Math.floor(Math.random() * Math.min(memes.length, 5))]
+
+//       memeContent.innerHTML = `
+//         <div class="meme-container">
+//           <img src="${randomMeme.image_url}" alt="${randomMeme.title}" class="meme-image"
+//                onerror="this.parentElement.innerHTML='<div class=\\'meme-error\\'>Meme failed to load 💀</div>'" />
+//           <div class="meme-title">${randomMeme.title}</div>
+//           <div class="meme-query">Search: "${query}"</div>
+//         </div>
+//       `
+//     })
+//   } catch (error) {
+//     console.error("Error displaying meme:", error)
+//     memeContent.innerHTML = `
+//       <div class="meme-fallback">
+//         <div class="meme-emoji">🤖</div>
+//         <div class="meme-text">Meme machine broke, try again later</div>
+//       </div>
+//     `
+//   }
+// }
 
 // --- POWER-UP SYSTEM ---
 const POWER_UPS = {
@@ -432,7 +433,7 @@ function initializePowerUps() {
     "time-boost": 0,
     shield: 0,
   }
-  state.coins = 1 
+  state.coins = 1 // Start with more coins since powerups are more expensive
   state.activeEffects = {
     doublePoints: false,
     timeBoost: false,
@@ -900,20 +901,19 @@ function showLoading(show) {
 function transformForMemeMode(q) {
   const newQ = { ...q }
   if (q.type === "mc") {
-    newQ.question = `🔥 ${q.question} (No Ls, only Ws)`
-    const memeOptions = [...MEME_OPTIONS].sort(() => 0.5 - Math.random()).slice(0, 2)
-    newQ.options = [
-      ...q.options.map((opt) => {
-        if (opt.toLowerCase() === q.answer.toLowerCase()) {
-          return `${opt} (no cap fr fr)`
-        }
-        return `${opt} (${Math.random() > 0.5 ? "mid but valid" : "💀"})`
-      }),
-      ...memeOptions,
-    ].sort(() => 0.5 - Math.random())
-    newQ.answer = `${q.answer} (no cap fr fr)`
+    newQ.question = `🔥 ${q.question} (no cap fr fr)`
+    // Keep original options but add slang annotations
+    newQ.options = q.options.map((opt) => {
+      if (opt.toLowerCase() === q.answer.toLowerCase()) {
+        return `${opt} (this one hits different 💯)`
+      }
+      return `${opt} (sus but maybe valid 🤔)`
+    })
+    // Keep the correct answer intact but with slang annotation
+    newQ.answer =
+      q.options.find((opt) => opt.toLowerCase() === q.answer.toLowerCase()) + " (this one hits different 💯)"
   } else {
-    newQ.question = `💀 ${q.question} (go giga-brain mode)`
+    newQ.question = `💀 ${q.question} (drop that fire answer bestie)`
   }
   return newQ
 }
@@ -1199,16 +1199,13 @@ async function handleAnswerSubmit(e) {
     }
 
     if (state.memeMode) {
-      result.feedback = isCorrect ? "W answer, giga-brain 🧠" : "Skill issue 💀"
+      result.feedback = isCorrect
+        ? "Periodt! That's the correct answer bestie! 💯🔥"
+        : "Oop, that's not it chief. The correct answer is giving main character energy! 💀"
     } else {
       result.feedback = isCorrect ? "Correct!" : `Incorrect. The right answer is: ${originalQ.answer}`
     }
     questionFeedback.innerHTML = `<b>Feedback:</b> ${result.feedback}<br><em>${originalQ.explanation}</em>`
-
-    // Display meme in meme mode
-    if (state.memeMode) {
-      displayMeme(originalQ.topic, result.score, isCorrect)
-    }
   } else {
     questionFeedback.innerHTML = "<b>AI is evaluating your answer...</b><br><em>Note: This may take a few seconds.</em>"
     try {
@@ -1223,11 +1220,6 @@ async function handleAnswerSubmit(e) {
         updateAchievementStats("streak", newStreak)
       } else {
         updateAchievementStats("streak", 0)
-      }
-
-      // Display meme for short answer questions too
-      if (state.memeMode) {
-        displayMeme(originalQ.topic, result.score, result.score >= 70)
       }
     } catch (e) {
       console.error("Evaluation error:", e)
