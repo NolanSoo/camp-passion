@@ -783,7 +783,7 @@ async function generateQuestionBatch(numToGenerate) {
   const shortAnswerPercent = Number.parseInt(settings["short-answer"]) || 0
   const numShortAnswer = Math.round((numToGenerate * shortAnswerPercent) / 100)
   const numMultipleChoice = numToGenerate - numShortAnswer
-
+  console.log(`Generating ${numMultipleChoice} MC and ${numShortAnswer} short answer questions`);
   const prompt = `Generate a test with these parameters:
           Topic: ${settings.topic}, Grade: ${settings["grade-level"]}, Subject: ${settings.subject}
           Description: ${settings.description}
