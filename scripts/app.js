@@ -432,7 +432,7 @@ function initializePowerUps() {
     "time-boost": 0,
     shield: 0,
   }
-  state.coins = 10 // Start with more coins since powerups are more expensive
+  state.coins = 1 
   state.activeEffects = {
     doublePoints: false,
     timeBoost: false,
