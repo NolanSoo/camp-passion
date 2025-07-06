@@ -432,7 +432,7 @@ function initializePowerUps() {
     "time-boost": 0,
     shield: 0,
   }
-  state.coins = 2 // Start with 2 coins
+  state.coins = 2 // Start with more coins since powerups are more expensive
   state.activeEffects = {
     doublePoints: false,
     timeBoost: false,
@@ -780,10 +780,15 @@ async function makeApiCall(prompt) {
 async function generateQuestionBatch(numToGenerate) {
   const { settings, sessionId } = state
   const recentQs = questionTracker.getRecentQuestions(sessionId).join(" | ")
+  const shortAnswerPercent = Number.parseInt(settings["short-answer"]) || 0
+  const numShortAnswer = Math.round((numToGenerate * shortAnswerPercent) / 100)
+  const numMultipleChoice = numToGenerate - numShortAnswer
+
   const prompt = `Generate a test with these parameters:
           Topic: ${settings.topic}, Grade: ${settings["grade-level"]}, Subject: ${settings.subject}
           Description: ${settings.description}
           # of Questions to generate in this batch: ${numToGenerate}
+          Question type distribution: ${numMultipleChoice} multiple choice questions and ${numShortAnswer} short answer questions
           Avoid repeating these questions: ${recentQs || "None"}
           Return as a JSON array of questions. Each question must have:
           - type: "mc" or "short"
@@ -792,7 +797,9 @@ async function generateQuestionBatch(numToGenerate) {
           - (for mc) answer: the correct option string
           - (for short) answer: a detailed model answer string
           - topic: specific sub-topic string
-          - explanation: string explaining the correct answer.`
+          - explanation: string explaining the correct answer.
+          
+          IMPORTANT: Generate exactly ${numMultipleChoice} questions with type "mc" and exactly ${numShortAnswer} questions with type "short".`
 
   const newQuestions = await makeApiCall(prompt)
   if (!Array.isArray(newQuestions)) {
