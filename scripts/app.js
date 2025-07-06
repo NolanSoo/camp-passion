@@ -432,7 +432,7 @@ function initializePowerUps() {
     "time-boost": 0,
     shield: 0,
   }
-  state.coins = 1 
+  state.coins = 10 // Start with more coins since powerups are more expensive
   state.activeEffects = {
     doublePoints: false,
     timeBoost: false,
@@ -783,7 +783,7 @@ async function generateQuestionBatch(numToGenerate) {
   const shortAnswerPercent = Number.parseInt(settings["short-answer"]) || 0
   const numShortAnswer = Math.round((numToGenerate * shortAnswerPercent) / 100)
   const numMultipleChoice = numToGenerate - numShortAnswer
-  console.log(`Generating ${numMultipleChoice} MC and ${numShortAnswer} short answer questions`);
+
   const prompt = `Generate a test with these parameters:
           Topic: ${settings.topic}, Grade: ${settings["grade-level"]}, Subject: ${settings.subject}
           Description: ${settings.description}
@@ -964,10 +964,23 @@ function renderQuestion(qIndex) {
   }
   userTestForm.appendChild(wrapper)
 
+  // Calculate time based on question type and complexity
+  let startTime
+  if (q.type === "mc") {
+    // Multiple choice: 20-60 seconds based on question complexity
+    const baseTime = 40 // Average of 20-60
+    const variation = Math.random() * 40 - 20 // Random between -20 and +20
+    startTime = Math.max(20, Math.min(60, Math.round(baseTime + variation)))
+  } else {
+    // Short answer: 110-220 seconds (average 140)
+    const baseTime = 140
+    const variation = Math.random() * 110 - 30 // Random between -30 and +80 to get 110-220 range
+    startTime = Math.max(110, Math.min(220, Math.round(baseTime + variation)))
+  }
+
   // Apply time boost if active
-  let startTime = 45
   if (state.activeEffects.timeBoost) {
-    startTime = 75
+    startTime += 30
     state.activeEffects.timeBoost = false
     showToast("⚡ Time boost applied! +30 seconds!")
   }
