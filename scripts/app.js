@@ -901,19 +901,23 @@ function showLoading(show) {
 function transformForMemeMode(q) {
   const newQ = { ...q }
   if (q.type === "mc") {
-    newQ.question = `🔥 ${q.question} (no cap fr fr)`
-    // Keep original options but add slang annotations
+    // Keep question normal, just occasionally add slang to options
+    newQ.question = q.question
     newQ.options = q.options.map((opt) => {
       if (opt.toLowerCase() === q.answer.toLowerCase()) {
-        return `${opt} (this one hits different 💯)`
+        return opt // Keep correct answer clean
       }
-      return `${opt} (sus but maybe valid 🤔)`
+      // Occasionally add slang to wrong options (30% chance)
+      if (Math.random() < 0.3) {
+        const slangSuffixes = ["(sus)", "(mid)", "(cap)", "(no cap)", "(fr?)"]
+        return `${opt} ${slangSuffixes[Math.floor(Math.random() * slangSuffixes.length)]}`
+      }
+      return opt
     })
-    // Keep the correct answer intact but with slang annotation
-    newQ.answer =
-      q.options.find((opt) => opt.toLowerCase() === q.answer.toLowerCase()) + " (this one hits different 💯)"
+    newQ.answer = q.answer // Keep answer clean
   } else {
-    newQ.question = `💀 ${q.question} (drop that fire answer bestie)`
+    // Keep short answer questions normal
+    newQ.question = q.question
   }
   return newQ
 }
@@ -1025,6 +1029,54 @@ function updateLiveStats() {
   liveWeaknessesEl.innerHTML = `<b>Weaknesses:</b> <ul>${Array.from(state.weaknesses)
     .map((s) => `<li>${s}</li>`)
     .join("")}</ul>`
+}
+
+async function showMidQuizReview() {
+  // Temporarily hide quiz elements
+  userTestForm.style.display = "none"
+  submitTestBtn.style.display = "none"
+  questionFeedback.style.display = "none"
+  aiFeedbackCard.style.display = "none"
+
+  // Create review container
+  const reviewContainer = document.createElement("div")
+  reviewContainer.id = "mid-quiz-review"
+  reviewContainer.className = "mid-quiz-review"
+  reviewContainer.innerHTML = `
+    <h3>📊 Progress Check - Question ${state.currentQuestionIndex}</h3>
+    <div class="review-stats">
+      ${liveScore.innerHTML}
+      ${liveStrengthsEl.innerHTML}
+      ${liveWeaknessesEl.innerHTML}
+    </div>
+    <div class="review-recommendations">
+      <h4>💡 Quick Tips</h4>
+      <div id="mid-recommendations-content">Generating quick study tips...</div>
+    </div>
+    <button id="continue-quiz-btn" class="primary-btn">Continue Quiz 🚀</button>
+  `
+
+  // Insert review after the question number
+  const questionHeader = document.querySelector("#test-section h2")
+  questionHeader.insertAdjacentElement("afterend", reviewContainer)
+
+  // Generate quick recommendations
+  try {
+    const recommendations = await getStudyRecommendations()
+    document.getElementById("mid-recommendations-content").innerHTML = recommendations.replace(/\n/g, "<br>")
+  } catch (e) {
+    document.getElementById("mid-recommendations-content").textContent =
+      "Keep up the great work! Focus on the areas you're struggling with."
+  }
+
+  // Add continue button handler
+  document.getElementById("continue-quiz-btn").onclick = () => {
+    reviewContainer.remove()
+    userTestForm.style.display = "block"
+    submitTestBtn.style.display = "block"
+    questionFeedback.style.display = "block"
+    renderQuestion(state.currentQuestionIndex)
+  }
 }
 
 async function showResults() {
@@ -1199,9 +1251,29 @@ async function handleAnswerSubmit(e) {
     }
 
     if (state.memeMode) {
-      result.feedback = isCorrect
-        ? "Periodt! That's the correct answer bestie! 💯🔥"
-        : "Oop, that's not it chief. The correct answer is giving main character energy! 💀"
+      if (isCorrect) {
+        const correctResponses = [
+          "Periodt! That's the correct answer bestie! 💯🔥",
+          "No cap, you absolutely ate that question! 🔥",
+          "Slay queen/king! That's the right answer fr fr 💯",
+          "You understood the assignment! Big brain energy 🧠✨",
+          "That's it, that's the tweet! Correct! 🎯",
+          "Main character moment right there! 💅✨",
+        ]
+        result.feedback = correctResponses[Math.floor(Math.random() * correctResponses.length)]
+      } else {
+        const incorrectResponses = [
+          "Oop, that ain't it chief 💀 The correct answer was serving main character energy!",
+          "Bestie... that's a no from me 😭 The right answer was right there!",
+          "Not you missing that question 💀 It's giving skill issue vibes ngl",
+          "Girlie/bestie, that's not the vibe 😬 The correct answer was the moment!",
+          "That's... not it bestie 💀 The right answer was literally right there!",
+          "Ouch, that one hit different (in a bad way) 😭",
+        ]
+        result.feedback =
+          incorrectResponses[Math.floor(Math.random() * incorrectResponses.length)] +
+          ` The correct answer is: ${originalQ.answer}`
+      }
     } else {
       result.feedback = isCorrect ? "Correct!" : `Incorrect. The right answer is: ${originalQ.answer}`
     }
@@ -1252,6 +1324,17 @@ async function handleAnswerSubmit(e) {
     () => {
       state.currentQuestionIndex++
       const totalQuestions = Number.parseInt(state.settings["num-questions"], 10)
+
+      // Check for mid-quiz review every 10 questions
+      if (state.currentQuestionIndex % 10 === 0 && state.currentQuestionIndex < totalQuestions) {
+        setTimeout(
+          () => {
+            showMidQuizReview()
+          },
+          q.type === "short" ? 4000 : state.memeMode ? 3000 : 1500,
+        )
+        return
+      }
 
       if (state.currentQuestionIndex < totalQuestions) {
         // Check if the next question is ready
